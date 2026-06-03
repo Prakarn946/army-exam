@@ -1,4 +1,4 @@
-import { initStore, getQuestions, saveQuestions, getAttempts, getConfig, saveConfig, resetDatabase, getSubjects, getUsers, saveUsers, syncFromBackend, saveAttempts } from './store.js?v=5';
+import { initStore, getQuestions, saveQuestions, getAttempts, getConfig, saveConfig, resetDatabase, getSubjects, getUsers, saveUsers, syncFromBackend, saveAttempts, getDbSizeBytes } from './store.js?v=5';
 import { registerUser, loginUser, logoutUser, getCurrentUser, isAdmin, isLoggedIn } from './auth.js?v=5';
 import { startNewExam, getActiveSession, answerQuestion, toggleMarkForReview, submitExam, clearActiveSession, saveActiveSession } from './exam.js?v=5';
 import { saveQuestionItem, deleteQuestionItem, saveSubjectConfig, saveExamDuration, addMember, updateMember, deleteMember, syncFromGoogleSheets, updateSubjectConfigs } from './admin.js?v=5';
@@ -36,9 +36,17 @@ function showView(viewId) {
     views.forEach(id => {
         const el = document.getElementById(id);
         if (id === viewId) {
-            if (el) el.classList.remove('d-none');
+            if (el) {
+                el.classList.remove('d-none');
+                el.classList.remove('fade-in');
+                void el.offsetWidth; // Trigger reflow
+                el.classList.add('fade-in');
+            }
         } else {
-            if (el) el.classList.add('d-none');
+            if (el) {
+                el.classList.add('d-none');
+                el.classList.remove('fade-in');
+            }
         }
     });
 
@@ -228,12 +236,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // 6. Form submissions (Login & Register)
-    document.getElementById('login-form').addEventListener('submit', (e) => {
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const email = document.getElementById('login-email').value;
         const pass = document.getElementById('login-password').value;
         try {
-            const user = loginUser(email, pass);
+            const user = await loginUser(email, pass);
             showToast(`เข้าสู่ระบบสำเร็จ ยินดีต้อนรับ ${user.name}`);
             document.getElementById('login-form').reset();
             checkSessionAndRedirect();
@@ -986,10 +994,21 @@ function renderQuestion(index) {
     document.getElementById('exam-question-number-title').textContent = `ข้อที่ ${index + 1} / ${questions.length}`;
 
     // Question body text
-    document.getElementById('exam-question-text').textContent = q.question;
+    const qText = document.getElementById('exam-question-text');
+    if (qText) {
+        qText.textContent = q.question;
+        qText.classList.remove('fade-in');
+        void qText.offsetWidth; // Trigger reflow
+        qText.classList.add('fade-in');
+    }
 
     // Choices
     const choicesContainer = document.getElementById('exam-choices-container');
+    if (choicesContainer) {
+        choicesContainer.classList.remove('fade-in');
+        void choicesContainer.offsetWidth; // Trigger reflow
+        choicesContainer.classList.add('fade-in');
+    }
     choicesContainer.innerHTML = '';
 
     const questionChoices = session.choicesMap[q.id];
@@ -2816,17 +2835,9 @@ Object.defineProperty(window, 'tempFileQuestions', {
 // ADMIN DASHBOARD WIDGETS
 // ==========================================
 function renderDatabaseCapacity() {
-    // Calculate total size of localstorage
-    let totalBytes = 0;
-    for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        const val = localStorage.getItem(key);
-        if (key && val) {
-            totalBytes += key.length + val.length;
-        }
-    }
-
-    const maxBytes = 5 * 1024 * 1024; // 5.0 MB Limit
+    // Calculate total size based on actual DB size bytes from Supabase PostgreSQL
+    const totalBytes = getDbSizeBytes();
+    const maxBytes = 500 * 1024 * 1024; // 500.0 MB Limit for Supabase Free Tier
     const percentage = Math.min(100, (totalBytes / maxBytes) * 100);
 
     // Format size text
@@ -2844,7 +2855,7 @@ function renderDatabaseCapacity() {
     const text = document.getElementById('db-capacity-text');
     if (bar && text) {
         bar.style.width = `${percentage.toFixed(2)}%`;
-        text.textContent = `${formattedSize} (${percentage.toFixed(2)}%)`;
+        text.textContent = `${formattedSize} / 500.00 MB (${percentage.toFixed(2)}%)`;
 
         // Bar colors: glowing neon blue sky gradient with neon box shadow
         bar.style.background = 'linear-gradient(90deg, #00d2ff, #0072ff)';
@@ -2972,19 +2983,29 @@ async function sendHeartbeat() {
     const user = getCurrentUser();
     if (!user) return;
     
+    const sessionId = sessionStorage.getItem('army_exam_session_id') || '';
     const payload = {
         gmail: user.gmail,
         name: user.name,
         role: user.role,
-        status: getCurrentStatusText()
+        status: getCurrentStatusText(),
+        sessionId: sessionId
     };
     
     try {
-        await fetch('/api/heartbeat', {
+        const res = await fetch('/api/heartbeat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
+        if (res.ok) {
+            const data = await res.json();
+            if (data.status === 'error' && data.message === 'session_conflict') {
+                alert('บัญชีนี้เข้าสู่ระบบจากเครื่องอื่นแล้ว ระบบจะนำคุณออกจากระบบโดยอัตโนมัติ');
+                logoutUser();
+                window.location.reload();
+            }
+        }
     } catch (err) {
         console.error("Heartbeat sync error:", err);
     }

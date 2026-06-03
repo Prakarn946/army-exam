@@ -41,26 +41,46 @@ export function registerUser(gmail, password, name, role = 'candidate') {
 }
 
 // Log in a user
-export function loginUser(gmail, password) {
+export async function loginUser(gmail, password) {
     if (!gmail || !password) {
         throw new Error('กรุณากรอก Gmail และรหัสผ่าน');
     }
 
-    const users = getUsers();
-    const user = users.find(u => u.gmail.toLowerCase() === gmail.toLowerCase() && u.password === password);
+    // Generate a unique session ID
+    const sessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 
-    if (!user) {
-        throw new Error('Gmail หรือรหัสผ่านไม่ถูกต้อง');
+    const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gmail: gmail, password: password, sessionId: sessionId })
+    });
+
+    if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || 'เข้าสู่ระบบล้มเหลว');
     }
 
-    // Save user session in sessionStorage
+    const data = await res.json();
+    const user = data.user;
+
+    // Save user session and sessionId in sessionStorage
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(user));
+    sessionStorage.setItem('army_exam_session_id', sessionId);
     return user;
 }
 
 // Log out user
 export function logoutUser() {
+    const user = getCurrentUser();
+    if (user && user.gmail) {
+        fetch('/api/logout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ gmail: user.gmail })
+        }).catch(err => console.error("Error logging out from server:", err));
+    }
     sessionStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem('army_exam_session_id');
 }
 
 // Get current logged-in user

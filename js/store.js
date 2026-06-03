@@ -436,7 +436,8 @@ let localCache = {
     questions: [],
     users: [],
     config: {},
-    attempts: []
+    attempts: [],
+    dbSizeBytes: 0
 };
 
 // Sync from backend
@@ -449,12 +450,14 @@ export async function syncFromBackend() {
             localCache.users = data.users || [];
             localCache.config = data.config || {};
             localCache.attempts = data.attempts || [];
+            localCache.dbSizeBytes = data.db_size_bytes || 0;
             
             // Backup to localStorage
             localStorage.setItem(STORE_KEYS.QUESTIONS, JSON.stringify(localCache.questions));
             localStorage.setItem(STORE_KEYS.USERS, JSON.stringify(localCache.users));
             localStorage.setItem(STORE_KEYS.CONFIG, JSON.stringify(localCache.config));
             localStorage.setItem(STORE_KEYS.ATTEMPTS, JSON.stringify(localCache.attempts));
+            localStorage.setItem('army_exam_db_size_bytes', localCache.dbSizeBytes.toString());
             return true;
         }
     } catch (e) {
@@ -466,7 +469,12 @@ export async function syncFromBackend() {
     localCache.users = JSON.parse(localStorage.getItem(STORE_KEYS.USERS)) || [];
     localCache.config = JSON.parse(localStorage.getItem(STORE_KEYS.CONFIG)) || DEFAULT_CONFIG;
     localCache.attempts = JSON.parse(localStorage.getItem(STORE_KEYS.ATTEMPTS)) || [];
+    localCache.dbSizeBytes = parseInt(localStorage.getItem('army_exam_db_size_bytes') || '0');
     return false;
+}
+
+export function getDbSizeBytes() {
+    return localCache.dbSizeBytes || parseInt(localStorage.getItem('army_exam_db_size_bytes') || '0');
 }
 
 // Initialize Store

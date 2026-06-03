@@ -104,15 +104,23 @@ def get_db():
                 "questionResults": r[8]
             })
             
+        # Load database size
+        try:
+            cur.execute("SELECT pg_database_size(current_database());")
+            db_size_bytes = cur.fetchone()[0]
+        except Exception:
+            db_size_bytes = 0
+
         return {
             "questions": questions,
             "users": users,
             "config": config,
-            "attempts": attempts
+            "attempts": attempts,
+            "db_size_bytes": db_size_bytes
         }
     except Exception as e:
         print(f"Error loading database: {e}")
-        return {"questions": [], "users": [], "config": {}, "attempts": []}
+        return {"questions": [], "users": [], "config": {}, "attempts": [], "db_size_bytes": 0}
     finally:
         release_db_connection(conn)
 
@@ -154,12 +162,21 @@ async def heartbeat(request: Request):
     name = payload.get("name", "")
     role = payload.get("role", "")
     status = payload.get("status", "")
+    session_id = payload.get("sessionId", "")
+    
     if gmail:
+        now = time.time()
+        # Enforce single session check: if there is an active session with a different sessionId, reject
+        if gmail in active_sessions and now - active_sessions[gmail]["last_seen"] <= 20:
+            if active_sessions[gmail].get("sessionId") and active_sessions[gmail]["sessionId"] != session_id:
+                return {"status": "error", "message": "session_conflict"}
+                
         active_sessions[gmail] = {
             "name": name,
             "role": role,
             "status": status,
-            "last_seen": time.time()
+            "sessionId": session_id if session_id else active_sessions.get(gmail, {}).get("sessionId"),
+            "last_seen": now
         }
     return {"status": "success"}
 
@@ -371,6 +388,69 @@ async def save_attempts(request: Request):
         return JSONResponse(status_code=500, content={"error": str(e)})
     finally:
         release_db_connection(conn)
+
+@app.post("/api/login")
+async def login(request: Request):
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON")
+        
+    gmail = payload.get("gmail", "").lower().strip()
+    password = payload.get("password", "")
+    session_id = payload.get("sessionId", "")
+    
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT gmail, password, name, role, profile_image FROM users WHERE LOWER(gmail) = %s;", (gmail,))
+        row = cur.fetchone()
+        if not row or row[1] != password:
+            return JSONResponse(status_code=400, content={"error": "Gmail หรือรหัสผ่านไม่ถูกต้อง"})
+            
+        # Enforce 1 session per email: check if user is already online elsewhere
+        now = time.time()
+        if gmail in active_sessions and now - active_sessions[gmail]["last_seen"] <= 20:
+            if active_sessions[gmail].get("sessionId") and active_sessions[gmail]["sessionId"] != session_id:
+                return JSONResponse(status_code=400, content={
+                    "error": "บัญชีนี้กำลังเข้าสู่ระบบค้างไว้ในเครื่องอื่นอยู่ กรุณารอจนกว่าเครื่องเดิมจะออกจากระบบ หรือปิดเว็ปอย่างน้อย 20 วินาที"
+                })
+                
+        # Register/update session
+        active_sessions[gmail] = {
+            "name": row[2],
+            "role": row[3],
+            "status": "กำลังเข้าใช้งาน",
+            "sessionId": session_id,
+            "last_seen": now
+        }
+        
+        return {
+            "status": "success",
+            "user": {
+                "gmail": row[0],
+                "name": row[2],
+                "role": row[3],
+                "profileImage": row[4]
+            }
+        }
+    except Exception as e:
+        print(f"Error during login verification: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    finally:
+        release_db_connection(conn)
+
+@app.post("/api/logout")
+async def logout(request: Request):
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON")
+        
+    gmail = payload.get("gmail", "").lower().strip()
+    if gmail in active_sessions:
+        del active_sessions[gmail]
+    return {"status": "success"}
 
 # Mount static files at root "/"
 # StaticFiles is mounted last so that it does not intercept API routes
