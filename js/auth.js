@@ -72,11 +72,12 @@ export async function loginUser(gmail, password) {
 // Log out user
 export function logoutUser() {
     const user = getCurrentUser();
+    const sessionId = sessionStorage.getItem('army_exam_session_id') || '';
     if (user && user.gmail) {
         fetch('/api/logout', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ gmail: user.gmail })
+            body: JSON.stringify({ gmail: user.gmail, sessionId: sessionId })
         }).catch(err => console.error("Error logging out from server:", err));
     }
     sessionStorage.removeItem(SESSION_KEY);
