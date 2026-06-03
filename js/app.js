@@ -20,6 +20,15 @@ function updateLoginSubtitle() {
     }
 }
 
+// Populate the sidebar config input field
+function populateSidebarLoginSubtitle() {
+    const config = getConfig('ม.ปลาย');
+    const subtitleInput = document.getElementById('config-login-subtitle');
+    if (subtitleInput) {
+        subtitleInput.value = config.loginSubtitle || 'จำลองการสอบออนไลน์กองทัพบก';
+    }
+}
+
 
 // UI Toast Helper
 function showToast(message, type = 'success') {
@@ -155,6 +164,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Set subtitle in login view
     updateLoginSubtitle();
+    populateSidebarLoginSubtitle();
     
     // Start real-time heartbeat sync loop (every 8 seconds)
     setInterval(sendHeartbeat, 8000);
@@ -231,9 +241,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const resetLeaderboardBtn = document.getElementById('reset-leaderboard-btn');
     if (resetLeaderboardBtn) {
         resetLeaderboardBtn.addEventListener('click', () => {
-            if (confirm('⚠️ คุณต้องการรีเซ็ตประวัติคะแนนสอบของทุกคนใช่หรือไม่?\nการดำเนินการนี้จะล้างบอร์ดคะแนนสูงสุดทั้งหมดกลับเป็นค่าเริ่มต้น!')) {
-                saveAttempts([], activeQualificationScope);
-                showToast('🔄 รีเซ็ตประวัติคะแนนสูงสุดเรียบร้อยแล้ว');
+            if (confirm('⚠️ คุณต้องการลบประวัติคะแนนสอบของผู้ดูแลระบบ (แอดมิน) ทั้งหมดใช่หรือไม่?\n(ประวัติการทำข้อสอบของสมาชิกผู้เข้าสอบคนอื่นๆ จะไม่ถูกลบ)')) {
+                const users = getUsers();
+                const adminEmails = new Set(users.filter(u => u.role === 'admin').map(u => u.gmail.toLowerCase()));
+                const attempts = getAttempts(activeQualificationScope);
+                const memberAttempts = attempts.filter(att => !adminEmails.has((att.userGmail || '').toLowerCase().trim()));
+                
+                saveAttempts(memberAttempts, activeQualificationScope);
+                showToast('🔄 ลบประวัติคะแนนสอบจำลองของแอดมินเรียบร้อยแล้ว');
                 renderLeaderboard();
             }
         });
@@ -1577,6 +1592,30 @@ function initAdminDashboard() {
     // Render widgets
     renderDatabaseCapacity();
     renderLeaderboard();
+
+    // Populate and bind login subtitle widget in the sidebar (only one global setting)
+    populateSidebarLoginSubtitle();
+    const saveSubtitleBtn = document.getElementById('save-login-subtitle-btn');
+    if (saveSubtitleBtn && !saveSubtitleBtn.dataset.bound) {
+        saveSubtitleBtn.dataset.bound = 'true';
+        saveSubtitleBtn.onclick = () => {
+            const inputVal = (document.getElementById('config-login-subtitle').value || '').trim();
+            const subtitle = inputVal || 'จำลองการสอบออนไลน์กองทัพบก';
+            
+            // Save to both qualification configs to stay synchronized
+            const configHS = getConfig('ม.ปลาย');
+            configHS.loginSubtitle = subtitle;
+            saveConfig(configHS, 'ม.ปลาย');
+            
+            const configBach = getConfig('ป.ตรี');
+            configBach.loginSubtitle = subtitle;
+            saveConfig(configBach, 'ป.ตรี');
+            
+            // Immediately update the login view subtitle text
+            updateLoginSubtitle();
+            showToast('💾 บันทึกข้อความหน้าล็อกอินเรียบร้อยแล้ว!');
+        };
+    }
 }
 
 function switchAdminTab(tabId) {
@@ -1738,8 +1777,6 @@ function renderAdminSubjectConfigs() {
 
     // Fill duration
     document.getElementById('config-duration').value = config.durationMinutes || 180;
-    document.getElementById('config-login-subtitle').value = config.loginSubtitle || 'จำลองการสอบออนไลน์กองทัพบก';
-
     // Handle Form Submit
     document.getElementById('admin-config-form').onsubmit = (e) => {
         e.preventDefault();
@@ -1747,7 +1784,7 @@ function renderAdminSubjectConfigs() {
         const rows = container.querySelectorAll('.config-subject-row');
         const newConfig = {
             durationMinutes: parseInt(document.getElementById('config-duration').value) || 180,
-            loginSubtitle: document.getElementById('config-login-subtitle').value.trim() || 'จำลองการสอบออนไลน์กองทัพบก',
+            loginSubtitle: config.loginSubtitle || 'จำลองการสอบออนไลน์กองทัพบก', // Preserve global setting
             subjectOrder: []
         };
 
@@ -1797,15 +1834,6 @@ function renderAdminSubjectConfigs() {
 
         // Save new config
         saveConfig(newConfig, activeQualificationScope);
-
-        // Also synchronize the loginSubtitle globally to the other qualification so they stay in sync
-        const otherQual = activeQualificationScope === 'ม.ปลาย' ? 'ป.ตรี' : 'ม.ปลาย';
-        const otherConfig = getConfig(otherQual);
-        otherConfig.loginSubtitle = newConfig.loginSubtitle;
-        saveConfig(otherConfig, otherQual);
-
-        // Update UI login subtitle immediately
-        updateLoginSubtitle();
 
         // Save updated questions if renamed
         if (questionsUpdated) {
