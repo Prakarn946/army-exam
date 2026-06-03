@@ -244,35 +244,41 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // 6. Form submissions (Login & Register)
-    document.getElementById('login-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const email = document.getElementById('login-email').value;
-        const pass = document.getElementById('login-password').value;
-        try {
-            const user = await loginUser(email, pass);
-            showToast(`เข้าสู่ระบบสำเร็จ ยินดีต้อนรับ ${user.name}`);
-            document.getElementById('login-form').reset();
-            checkSessionAndRedirect();
-        } catch (error) {
-            showToast(error.message, 'error');
-        }
-    });
+    const loginForm = document.getElementById('login-form');
+    if (loginForm) {
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const pass = document.getElementById('login-password').value;
+            try {
+                const user = await loginUser(email, pass);
+                showToast(`เข้าสู่ระบบสำเร็จ ยินดีต้อนรับ ${user.name}`);
+                loginForm.reset();
+                checkSessionAndRedirect();
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        });
+    }
 
-    document.getElementById('register-form').addEventListener('submit', (e) => {
-        e.preventDefault();
-        const name = document.getElementById('register-name').value;
-        const email = document.getElementById('register-email').value;
-        const pass = document.getElementById('register-password').value;
-        try {
-            registerUser(email, pass, name, 'candidate');
-            showToast('สมัครสมาชิกสำเร็จ กรุณาเข้าสู่ระบบด้วยบัญชีของคุณ');
-            document.getElementById('register-form').reset();
-            document.getElementById('register-form-container').classList.add('d-none');
-            document.getElementById('login-form-container').classList.remove('d-none');
-        } catch (error) {
-            showToast(error.message, 'error');
-        }
-    });
+    const registerForm = document.getElementById('register-form');
+    if (registerForm) {
+        registerForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = document.getElementById('register-name').value;
+            const email = document.getElementById('register-email').value;
+            const pass = document.getElementById('register-password').value;
+            try {
+                registerUser(email, pass, name, 'candidate');
+                showToast('สมัครสมาชิกสำเร็จ กรุณาเข้าสู่ระบบด้วยบัญชีของคุณ');
+                registerForm.reset();
+                document.getElementById('register-form-container').classList.add('d-none');
+                document.getElementById('login-form-container').classList.remove('d-none');
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        });
+    }
 
     // 7. Exam controls
     const instructionModal = document.getElementById('instruction-modal');
