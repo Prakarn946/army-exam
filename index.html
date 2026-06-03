@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="th" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบจำลองการสอบออนไลน์ - Army Exam Simulator</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <!-- CropperJS libraries for image cropping -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
+    <!-- Chart.js for dashboard progress chart -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SheetJS and Mammoth for Word/Excel import -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js"></script>
+</head>
+<body>
+    <div id="app">
+        <!-- HEADER NAVBAR -->
+        <header class="d-none" id="app-header">
+            <div class="nav-container">
+                <div class="logo-section">
+                    <div class="logo-icon">🎖️</div>
+                    <div class="logo-text">ARMY EXAM</div>
+                </div>
+                <div class="nav-controls">
+                    <!-- Admin Panel Toggle (Only visible to Admin) -->
+                    <button id="admin-toggle-btn" class="admin-toggle-btn d-none">
+                        ⚙️ จัดการระบบ
+                    </button>
+                    <!-- Theme Toggle -->
+                    <button id="theme-toggle-btn" class="theme-toggle-btn">
+                        🌙
+                    </button>
+                    <!-- User Profile & Log Out -->
+                    <div class="user-profile">
+                        <div class="user-avatar" id="header-user-avatar-container">
+                            <span id="header-user-avatar-letter">U</span>
+                            <img id="header-user-avatar-img" class="d-none" alt="Avatar">
+                        </div>
+                        <div class="user-info">
+                            <span class="user-name" id="header-user-name">กำลังโหลด...</span>
+                            <span class="user-role" id="header-user-role">ผู้สอบ</span>
+                        </div>
+                    </div>
+                    <button id="admin-copy-link-btn" class="admin-copy-link-btn d-none">🔗 คัดลอกลิงก์ส่งให้ผู้สอบ</button>
+                    <button id="logout-btn" class="logout-btn">ออกจากระบบ</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- MAIN CONTAINER -->
+        <main>
+            <!-- 1. AUTHENTICATION VIEW -->
+            <section id="auth-view" class="d-none">
+                <div class="auth-container">
+                    <!-- Login Form -->
+                    <div id="login-form-container">
+                        <div class="auth-header">
+                            <h2>เข้าสู่ระบบ</h2>
+                            <p>จำลองการสอบออนไลน์กองทัพบก</p>
+                        </div>
+                        <form id="login-form">
+                            <div class="form-group">
+                                <label for="login-email">Gmail ผู้ใช้งาน</label>
+                                <input type="email" id="login-email" class="form-input" placeholder="example@gmail.com" required autocomplete="email">
+                            </div>
+                            <div class="form-group">
+                                <label for="login-password">รหัสผ่าน</label>
+                                <input type="password" id="login-password" class="form-input" placeholder="••••••" required autocomplete="current-password">
+                            </div>
+                            <button type="submit" class="primary-btn">เข้าสู่ระบบ</button>
+                        </form>
+
+                    </div>
+
+                    <!-- Register Form -->
+                    <div id="register-form-container" class="d-none">
+                        <div class="auth-header">
+                            <h2>สมัครสมาชิก</h2>
+                            <p>เพื่อเข้าสู่ระบบทำข้อสอบจำลอง</p>
+                        </div>
+                        <form id="register-form">
+                            <div class="form-group">
+                                <label for="register-name">ชื่อ-นามสกุลจริง</label>
+                                <input type="text" id="register-name" class="form-input" placeholder="ส.ต. สมจริง รักดี" required autocomplete="name">
+                            </div>
+                            <div class="form-group">
+                                <label for="register-email">Gmail สมาชิก</label>
+                                <input type="email" id="register-email" class="form-input" placeholder="example@gmail.com" required autocomplete="email">
+                            </div>
+                            <div class="form-group">
+                                <label for="register-password">กำหนดรหัสผ่าน</label>
+                                <input type="password" id="register-password" class="form-input" placeholder="••••••" required autocomplete="new-password">
+                            </div>
+                            <button type="submit" class="primary-btn">สมัครสมาชิก</button>
+                        </form>
+                        <div class="auth-switch">
+                            มีบัญชีอยู่แล้ว? <span id="switch-to-login">เข้าสู่ระบบที่นี่</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 2. DASHBOARD VIEW -->
+            <section id="dashboard-view" class="d-none">
+                <!-- Wrapper for Candidate Dashboard -->
+                <div id="candidate-dashboard-container" class="d-none">
+                    <div class="dashboard-grid">
+                    <!-- Left: Profile and Exam Start -->
+                    <div>
+                        <div class="dashboard-card" style="margin-bottom: 24px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px;">
+                                <!-- Left: Avatar & Greeting -->
+                                <div style="display: flex; align-items: center; gap: 20px;">
+                                    <div class="profile-avatar-container" id="dashboard-profile-avatar-trigger" style="position: relative; width: 70px; height: 70px; border-radius: 50%; overflow: hidden; cursor: pointer; border: 2.5px solid var(--primary-color); flex-shrink: 0; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+                                        <span id="dashboard-user-avatar-letter" style="font-size: 28px; font-weight: 700; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: var(--primary-light); color: white;">U</span>
+                                        <img id="dashboard-user-avatar-img" class="d-none" style="width: 100%; height: 100%; object-fit: cover;" alt="Avatar">
+                                        <div class="profile-avatar-overlay" style="position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.65); color: white; font-size: 9px; text-align: center; padding: 2px 0; opacity: 0; transition: var(--transition); font-weight: 600;">เปลี่ยนรูป</div>
+                                    </div>
+                                    <input type="file" id="profile-avatar-input" accept="image/*" class="d-none">
+                                    <div>
+                                        <h2 style="font-size: 22px; margin-bottom: 4px; border: none; padding: 0;">สวัสดี, <span id="dashboard-user-name">...</span></h2>
+                                        <p style="color: var(--text-sub); font-size: 13px; margin: 0;">
+                                            ยินดีต้อนรับสู่ระบบจำลองข้อสอบออนไลน์ | 
+                                            <span id="dashboard-profile-change-btn" style="color: var(--primary-light); cursor: pointer; font-weight: 600; text-decoration: underline;">อัปโหลดรูปโปรไฟล์</span>
+                                        </p>
+                                    </div>
+                                </div>
+                                <!-- Right: Start Exam Button -->
+                                <button id="dashboard-start-exam-btn" class="primary-btn submit-glow-btn" style="padding: 12px 24px; width: auto; font-size: 14px; margin: 0;">
+                                    📝 เริ่มทำข้อสอบ
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Statistics Grid -->
+                        <div class="stats-grid">
+                            <div class="stat-item">
+                                <div class="stat-val" id="stat-attempts-count">0</div>
+                                <div class="stat-label">ครั้งที่ทดสอบ</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-val" id="stat-best-score">0%</div>
+                                <div class="stat-label">คะแนนดีที่สุด</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-val" id="stat-latest-score">0%</div>
+                                <div class="stat-label">คะแนนล่าสุด</div>
+                            </div>
+                        </div>
+
+                        <!-- Progress Chart Card -->
+                        <div class="dashboard-card" id="dashboard-progress-chart-card">
+                            <h3 class="dashboard-title" style="font-size: 18px; margin-bottom: 16px;">📈 พัฒนาการทำข้อสอบ</h3>
+                            <div style="width: 100%; height: 230px; position: relative; margin-bottom: 12px;">
+                                <canvas id="progressChart"></canvas>
+                            </div>
+                            <!-- Timeframe Buttons Container -->
+                            <div class="timeframe-buttons-wrapper" id="timeframe-buttons-container" style="display: flex; justify-content: center; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;">
+                                <button class="timeframe-btn active" data-timeframe="all">ทั้งหมด</button>
+                                <button class="timeframe-btn" data-timeframe="day">วันนี้</button>
+                                <button class="timeframe-btn" data-timeframe="week">1 สัปดาห์</button>
+                                <button class="timeframe-btn" data-timeframe="month">1 เดือน</button>
+                                <button class="timeframe-btn" data-timeframe="year">1 ปี</button>
+                            </div>
+                            <!-- AI Feedback Box -->
+                            <div style="background: rgba(82, 124, 86, 0.04); border: 1.5px solid var(--primary-light); padding: 16px; border-radius: var(--radius-sm);">
+                                <h4 style="font-size: 13px; font-weight: 700; color: var(--primary-color); display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
+                                    🤖 บทวิเคราะห์และคำแนะนำโดย AI:
+                                </h4>
+                                <p id="ai-progress-recommendation" style="font-size: 13px; line-height: 1.6; color: var(--text-main); margin: 0;">
+                                    ระบบกำลังวิเคราะห์พัฒนาการทำข้อสอบของคุณหลังจากทำแบบทดสอบจำลอง...
+                                </p>
+                            </div>
+                        </div>
+
+                    <!-- Right: History Panel -->
+                    <div>
+                        <div class="dashboard-card" style="height: 100%;">
+                            <h3 class="dashboard-title" style="font-size: 18px;">ประวัติการทดสอบ</h3>
+                            <div class="history-list" id="dashboard-history-list">
+                                <!-- Dynamic history items -->
+                                <div class="text-center" style="color: var(--text-sub); padding: 40px 0;">
+                                    ไม่มีประวัติการทำข้อสอบ
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                </div>
+                </div>
+
+                <!-- Wrapper for Admin Dashboard -->
+                <div id="admin-dashboard-container" class="d-none">
+                    <div class="admin-layout">
+                    <!-- Sidebar Menu -->
+                    <div class="admin-sidebar-menu">
+                        <div style="font-weight: 800; font-size: 16px; padding: 12px 16px; border-bottom: 1px solid var(--border-color); margin-bottom: 12px; color: var(--primary-color);">
+                            🛡️ ระบบควบคุมหลังบ้าน
+                        </div>
+                        <div class="admin-menu-items-wrapper">
+                            <div class="admin-menu-item active" data-tab="admin-realtime" style="color: #00d2ff; font-weight: 600; border: 1.5px solid rgba(0, 210, 255, 0.2); box-shadow: 0 0 10px rgba(0, 210, 255, 0.1); margin-bottom: 8px; border-radius: var(--radius-sm);">
+                                <span>⚡ ติดตามเรียลไทม์</span>
+                                <span id="sidebar-active-badge" style="background: #ff0055; color: white; font-size: 11px; padding: 2px 6px; border-radius: 10px; margin-left: auto; font-weight: 700; box-shadow: 0 0 8px rgba(255, 0, 85, 0.5); animation: redPulse 2s infinite alternate;">15</span>
+                            </div>
+                            <div class="admin-menu-item" data-tab="admin-config">⚙️ ตั้งค่าจำนวนข้อสอบ</div>
+                            <div class="admin-menu-item" data-tab="admin-questions">📝 บริหารคลังข้อสอบ</div>
+                            <div class="admin-menu-item" data-tab="admin-members">👥 สมาชิกผู้เข้าสอบ</div>
+                            <div class="admin-menu-item" data-tab="admin-import">📥 นำเข้าข้อสอบ</div>
+                        </div>
+
+                    
+                            <!-- Database Capacity Widget -->
+                            <div class="admin-widget-card" style="margin-top: 24px; padding: 16px; background: var(--bg-card); border: 1.5px solid var(--border-color); border-radius: var(--radius-sm); box-shadow: 0 4px 12px var(--shadow-color);">
+                                <div style="font-weight: 700; font-size: 13px; margin-bottom: 10px; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+                                    🗄️ ความจุฐานข้อมูล
+                                </div>
+                                <div class="progress-bar-container" style="background: var(--bg-main); border: 1px solid var(--border-color); border-radius: 10px; height: 16px; overflow: hidden; position: relative;">
+                                    <div id="db-capacity-bar" style="background: linear-gradient(90deg, #4caf50, #81c784); width: 0%; height: 100%; transition: width 0.5s ease-in-out;"></div>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; font-size: 11px; margin-top: 6px; color: var(--text-sub); font-weight: 500;">
+                                    <span id="db-capacity-text">0.00 KB</span>
+                                    <span>เต็ม 5.00 MB</span>
+                                </div>
+                            </div>
+
+                            <!-- Top 3 Leaderboard Widget -->
+                            <div class="admin-widget-card" style="margin-top: 16px; padding: 16px; background: var(--bg-card); border: 1.5px solid var(--border-color); border-radius: var(--radius-sm); box-shadow: 0 4px 12px var(--shadow-color);">
+                                <div style="font-weight: 700; font-size: 13px; margin-bottom: 12px; color: var(--text-main); display: flex; align-items: center; justify-content: space-between; gap: 6px;">
+                                    <span>🏆 3 อันดับแรกทำคะแนนสูงสุด</span>
+                                    <button id="reset-leaderboard-btn" class="btn-xs delete" style="padding: 2px 8px; font-size: 10px; font-weight: 600; margin: 0; border-radius: 4px; cursor: pointer; transition: var(--transition);">
+                                        🔄 รีเซ็ต
+                                    </button>
+                                </div>
+                                <div id="leaderboard-list" style="display: flex; flex-direction: column; gap: 10px;">
+                                    <!-- Dynamic leaderboard rows -->
+                                </div>
+                            </div>
+</div>
+
+                    <div class="admin-panel-content">
+                        <!-- Tab 5: Realtime Monitor -->
+                        <div id="tab-admin-realtime" class="admin-tab-content">
+                            <div class="admin-section-header">
+                                <h3 style="font-weight: 700; border: none; padding: 0; margin: 0; font-size: 18px;">⚡ ติดตามสถานะเรียลไทม์ (Live System Monitor)</h3>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span class="live-indicator-dot"></span>
+                                    <span style="font-size: 13px; font-weight: 700; color: #00ff66;">ระบบเชื่อมต่อสด (Connected)</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Stat Cards Grid -->
+                            <div class="realtime-stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 28px;">
+                                <div class="realtime-stat-card" style="background: var(--bg-main); border: 1.5px solid var(--border-color); padding: 24px; border-radius: var(--radius-md); box-shadow: 0 4px 15px var(--shadow-color); position: relative; overflow: hidden; border-left: 5px solid #00d2ff;">
+                                    <div style="font-size: 13px; font-weight: 700; color: var(--text-sub); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">ผู้กำลังเข้าใช้งานเว็บไซต์</div>
+                                    <div style="display: flex; align-items: baseline; gap: 8px;">
+                                        <span id="realtime-online-count" style="font-size: 42px; font-weight: 800; color: #00d2ff; text-shadow: 0 0 10px rgba(0, 210, 255, 0.4);">12</span>
+                                        <span style="font-size: 14px; color: var(--text-sub); font-weight: 600;">คน</span>
+                                    </div>
+                                    <div style="position: absolute; right: -10px; bottom: -20px; font-size: 80px; opacity: 0.05; pointer-events: none;">👥</div>
+                                </div>
+                                <div class="realtime-stat-card" style="background: var(--bg-main); border: 1.5px solid var(--border-color); padding: 24px; border-radius: var(--radius-md); box-shadow: 0 4px 15px var(--shadow-color); position: relative; overflow: hidden; border-left: 5px solid #ff0055;">
+                                    <div style="font-size: 13px; font-weight: 700; color: var(--text-sub); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">ผู้กำลังทำข้อสอบจำลอง</div>
+                                    <div style="display: flex; align-items: baseline; gap: 8px;">
+                                        <span id="realtime-exam-count" style="font-size: 42px; font-weight: 800; color: #ff0055; text-shadow: 0 0 10px rgba(255, 0, 85, 0.4);">3</span>
+                                        <span style="font-size: 14px; color: var(--text-sub); font-weight: 600;">คน</span>
+                                    </div>
+                                    <div style="position: absolute; right: -10px; bottom: -20px; font-size: 80px; opacity: 0.05; pointer-events: none;">📝</div>
+                                </div>
+                            </div>
+                            
+                            <!-- Live User Table -->
+                            <h4 style="margin-bottom: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; font-size: 15px; color: var(--text-main);">🟢 ผู้ใช้งานที่กำลัง Active ในระบบ</h4>
+                            <div class="table-wrapper" style="margin-bottom: 28px;">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>ชื่อ-นามสกุล</th>
+                                            <th>Gmail</th>
+                                            <th>บทบาท</th>
+                                            <th>สถานะล่าสุด</th>
+                                            <th>เวลาล็อกอิน</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="realtime-users-table-body">
+                                        <!-- Dynamic active user rows -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <!-- Live Feed Ticker -->
+                            <h4 style="margin-bottom: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; font-size: 15px; color: var(--text-main);">📟 บันทึกกิจกรรมระบบสด (Live Activity Feed)</h4>
+                            <div id="realtime-activity-feed" style="background: #0d1117; color: #58a6ff; font-family: monospace; font-size: 13px; padding: 16px; border-radius: var(--radius-sm); height: 180px; overflow-y: auto; border: 1.5px solid var(--border-color); box-shadow: inset 0 2px 8px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 8px;">
+                                <!-- Live console output -->
+                            </div>
+                        </div>
+
+                        <!-- Tab 1: Config -->
+                        <div id="tab-admin-config" class="admin-tab-content d-none">
+                            <div class="admin-section-header">
+                                <h3>⚙️ ตั้งค่าแผนจัดสรรข้อสอบ</h3>
+                                <p style="color: var(--text-sub); font-size: 13px;">กำหนดความต้องการจำนวนข้อสอบในการสุ่มแต่ละรอบ</p>
+                            </div>
+                            <form id="admin-config-form">
+                                <div class="config-grid" id="admin-config-subjects-container">
+                                    <!-- Dynamic subject count inputs -->
+                                </div>
+                                <div class="form-group" style="max-width: 320px; background: var(--bg-main); padding: 16px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                                    <label for="config-duration" style="font-weight: 700;">⏰ เวลาจำกัดการสอบ (นาที)</label>
+                                    <input type="number" id="config-duration" class="form-input" min="5" max="360" required>
+                                </div>
+                                <button type="submit" class="primary-btn" style="max-width: 200px;">💾 บันทึกการตั้งค่า</button>
+                            </form>
+                        </div>
+
+                        <!-- Tab 2: Questions CRUD -->
+                        <div id="tab-admin-questions" class="admin-tab-content d-none">
+                            <div class="admin-section-header">
+                                <h3>📝 บริหารคลังข้อสอบ</h3>
+                                <button class="primary-btn" id="admin-add-question-btn" style="width: auto; padding: 10px 20px;">เพิ่มข้อสอบ</button>
+                            </div>
+                            <div class="flex align-center gap-3 mb-4">
+                                <div style="flex: 1;">
+                                    <input type="text" id="question-search-input" class="form-input" placeholder="🔍 ค้นหาคำถาม...">
+                                </div>
+                                <div style="width: 200px;">
+                                    <select id="question-subject-filter" class="form-input">
+                                        <option value="">ทั้งหมดทุกวิชา</option>
+                                        <!-- Dynamic options -->
+                                    </select>
+                                </div>
+                            </div>
+                            <div id="admin-questions-folders-container">
+                                <!-- Dynamic collapsible folders by subject & file will be rendered here -->
+                            </div>
+                        </div>
+
+                        <!-- Tab 3: Members CRUD -->
+                        <div id="tab-admin-members" class="admin-tab-content d-none">
+                            <div class="admin-section-header">
+                                <h3>👥 จัดการรายชื่อสมาชิก</h3>
+                                <button class="primary-btn" id="admin-add-member-btn" style="width: auto; padding: 10px 20px;">➕ เพิ่มสมาชิกใหม่</button>
+                            </div>
+                            <div class="table-wrapper">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Gmail</th>
+                                            <th>ชื่อ-นามสกุล</th>
+                                            <th>รหัสผ่าน</th>
+                                            <th>บทบาท</th>
+                                            <th style="text-align: center;">จัดการ</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="admin-members-table-body">
+                                        <!-- Dynamic rows -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Tab 4: Sheets & JSON Import/Export -->
+                        <div id="tab-admin-import" class="admin-tab-content d-none">
+                            <div class="admin-section-header">
+                                <h3>📥 นำเข้าข้อสอบจากระบบภายนอก</h3>
+                            </div>
+                            
+                            <!-- Google Sheets Card -->
+                            <div class="dashboard-card" style="background: var(--bg-main);">
+                                <h4 style="margin-bottom: 8px; font-weight: 700;">🔗 ดึงข้อมูลจาก Google Sheets (แชร์สาธารณะ)</h4>
+                                <p style="font-size: 13px; color: var(--text-sub); margin-bottom: 16px; line-height: 1.5;">
+                                    1. สร้างตาราง Google Sheets โดยแถวแรก (หัวตาราง) ต้องระบุชื่อคอลัมน์ดังนี้: <code style="background: var(--bg-card); padding: 2px 6px; border-radius: 4px; font-family: monospace;">วิชา</code>, <code style="background: var(--bg-card); padding: 2px 6px; border-radius: 4px; font-family: monospace;">คำถาม</code>, <code style="background: var(--bg-card); padding: 2px 6px; border-radius: 4px; font-family: monospace;">ก</code>, <code style="background: var(--bg-card); padding: 2px 6px; border-radius: 4px; font-family: monospace;">ข</code>, <code style="background: var(--bg-card); padding: 2px 6px; border-radius: 4px; font-family: monospace;">ค</code>, <code style="background: var(--bg-card); padding: 2px 6px; border-radius: 4px; font-family: monospace;">ง</code>, <code style="background: var(--bg-card); padding: 2px 6px; border-radius: 4px; font-family: monospace;">เฉลย</code>, <code style="background: var(--bg-card); padding: 2px 6px; border-radius: 4px; font-family: monospace;">คำอธิบาย</code><br>
+                                    2. ที่ไฟล์ชีท ให้กดเมนู <code style="font-family: monospace;">ไฟล์ > แชร์ > เผยแพร่ไปยังเว็บ</code> เลือกเผยแพร่ชีทปัจจุบันในรูปแบบ **CSV**<br>
+                                    3. คัดลอกลิงก์ที่แชร์สาธารณะมาวางด้านล่างนี้
+                                </p>
+                                <div class="form-group" style="max-width: 320px; margin-bottom: 16px;">
+                                    <label for="import-subject-select" style="font-weight: 700;">📂 เลือกวิชาสำหรับจัดเก็บข้อมูลนำเข้า</label>
+                                    <select id="import-subject-select" class="form-input">
+                                        <option value="all">🌐 นำเข้าตามวิชาที่ระบุในคอลัมน์ของไฟล์ (ทุกวิชา)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="import-sheets-url">ลิงก์ Google Sheets CSV หรือ ลิงก์แชร์ชีทปกติ</label>
+                                    <input type="url" id="import-sheets-url" class="form-input" placeholder="https://docs.google.com/spreadsheets/d/...">
+                                </div>
+                                <div class="flex gap-2" style="margin-bottom: 12px;">
+                                    <label style="font-size: 13px; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                        <input type="radio" name="import-mode" value="append" checked> นำเข้าแบบเพิ่มต่อจากของเดิม (ไม่เขียนทับข้อซ้ำ)
+                                    </label>
+                                </div>
+                                <div class="flex gap-2" style="margin-bottom: 20px;">
+                                    <label style="font-size: 13px; display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--accent-color);">
+                                        <input type="radio" name="import-mode" value="overwrite"> <span id="import-overwrite-label-text">ล้างคลังข้อสอบทั้งหมดแล้วดึงจากกูเกิลชีทมาแทนที่ (เขียนทับทั้งหมด)</span>
+                                    </label>
+                                </div>
+                                <button type="button" class="primary-btn" id="import-sheets-btn" style="max-width: 250px;">
+                                    ⚡ ซิงค์ข้อมูลกับ Google Sheets
+                                </button>
+                            </div>
+
+                            <!-- Word/Excel File Card -->
+                            <div class="dashboard-card" style="background: var(--bg-main); margin-bottom: 24px;">
+                                <h4 style="margin-bottom: 8px; font-weight: 700;">📄 นำเข้าจากไฟล์ Word (.docx) หรือ Excel (.xlsx / .xls)</h4>
+                                <p style="font-size: 13px; color: var(--text-sub); margin-bottom: 16px; line-height: 1.5;">
+                                    1. <strong>สำหรับไฟล์ Excel (.xlsx / .xls):</strong> แถวแรกระบุชื่อคอลัมน์ (วิชา, คำถาม, ก, ข, ค, ง, เฉลย, คำอธิบาย) หรือใช้ลำดับคอลัมน์มาตรฐาน<br>
+                                    2. <strong>สำหรับไฟล์ Word (.docx):</strong> แยกโจทย์ ตัวเลือก ก-ง และเฉลยโดยอัตโนมัติ (สามารถระบุบรรทัด <code>วิชา: [ชื่อวิชา]</code> เพื่อตั้งวิชาได้)
+                                </p>
+                                <div class="form-group" style="max-width: 320px; margin-bottom: 16px;">
+                                    <label for="import-file-subject-select" style="font-weight: 700;">📂 เลือกวิชาสำหรับจัดเก็บข้อมูลนำเข้า</label>
+                                    <select id="import-file-subject-select" class="form-input">
+                                        <option value="all">🌐 นำเข้าตามวิชาที่ระบุในไฟล์ (ทุกวิชา)</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group" style="margin-bottom: 20px;">
+                                    <label style="font-weight: 700;">📁 เลือกไฟล์ที่ต้องการนำเข้า (.docx, .xlsx, .xls)</label>
+                                    <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                                        <input type="file" id="import-doc-excel-file" accept=".docx,.xlsx,.xls" class="d-none">
+                                        <button type="button" class="secondary-btn" id="import-doc-excel-trigger" style="width: auto; margin: 0; padding: 10px 20px;">
+                                            📁 เลือกไฟล์ Word / Excel
+                                        </button>
+                                        <span id="import-selected-filename" style="font-size: 13px; color: var(--text-sub);">ไม่ได้เลือกไฟล์ใดๆ</span>
+                                    </div>
+                                </div>
+
+                                <div class="flex gap-2" style="margin-bottom: 12px;">
+                                    <label style="font-size: 13px; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                        <input type="radio" name="import-file-mode" value="append" checked> นำเข้าแบบเพิ่มต่อจากของเดิม (ไม่เขียนทับข้อซ้ำ)
+                                    </label>
+                                </div>
+                                <div class="flex gap-2" style="margin-bottom: 20px;">
+                                    <label style="font-size: 13px; display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--accent-color);">
+                                        <input type="radio" name="import-file-mode" value="overwrite"> <span id="import-file-overwrite-label-text">ล้างคลังข้อสอบทั้งหมดแล้วดึงข้อมูลจากไฟล์มาแทนที่ (เขียนทับทั้งหมด)</span>
+                                    </label>
+                                </div>
+
+                                <!-- Preview Container (Initially hidden) -->
+                                <div id="import-file-preview-container" class="d-none" style="border: 1.5px solid var(--primary-light); padding: 16px; border-radius: var(--radius-sm); background: var(--bg-card); margin-top: 16px;">
+                                    <h4 style="margin-bottom: 8px; font-weight: 700; color: var(--primary-color);">🔍 ตารางตัวอย่างข้อมูลที่ตรวจพบ (Preview)</h4>
+                                    <div id="import-file-stats" style="font-size: 13px; color: var(--text-main); margin-bottom: 12px; font-weight: 600;">
+                                        พบข้อสอบทั้งหมด 0 ข้อ (ข้อมูลครบถ้วน 0 ข้อ, ข้อมูลไม่สมบูรณ์ 0 ข้อ)
+                                    </div>
+                                    <div class="table-wrapper" style="max-height: 250px; overflow-y: auto; margin-bottom: 16px;">
+                                        <table style="font-size: 12px; width: 100%;">
+                                            <thead>
+                                                <tr>
+                                                    <th style="width: 12%;">วิชา</th>
+                                                    <th style="width: 43%;">คำถาม</th>
+                                                    <th style="width: 25%;">ตัวเลือก (ก, ข, ค, ง)</th>
+                                                    <th style="width: 10%; text-align: center;">เฉลย</th>
+                                                    <th style="width: 10%; text-align: center;">จัดการ</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="import-file-preview-body">
+                                                <!-- Dynamic preview rows -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div style="display: flex; gap: 12px; justify-content: flex-end; flex-wrap: wrap;">
+                                        <button type="button" class="secondary-btn" id="cancel-file-import-btn" style="margin: 0; width: auto; padding: 8px 16px; font-size: 13px;">ยกเลิก</button>
+                                        <button type="button" class="primary-btn submit-glow-btn" id="confirm-file-import-btn" style="margin: 0; width: auto; padding: 8px 24px; font-size: 13px;">💾 ยืนยันนำเข้าข้อสอบเข้าคลัง</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- JSON File Card -->
+                            <div class="dashboard-card" style="background: var(--bg-main);">
+                                <h4 style="margin-bottom: 8px; font-weight: 700;">📂 จัดการด้วยไฟล์ภายใน (JSON File Backup)</h4>
+                                <p style="font-size: 13px; color: var(--text-sub); margin-bottom: 16px;">
+                                    คุณสามารถสำรองข้อมูลข้อสอบปัจจุบันลงเครื่อง หรือนำเข้าไฟล์ข้อมูลที่บันทึกสำรองไว้กลับเข้าระบบ
+                                </p>
+                                <div class="flex gap-2 mb-4" style="flex-wrap: wrap;">
+                                    <button type="button" class="secondary-btn" id="export-questions-btn" style="width: auto; margin: 0; padding: 10px 20px;">
+                                        📤 ส่งออกคลังข้อสอบ (Export JSON)
+                                    </button>
+                                    <div style="position: relative;">
+                                        <input type="file" id="import-questions-file" accept=".json" class="d-none">
+                                        <button type="button" class="primary-btn" id="import-questions-file-trigger" style="width: auto; padding: 10px 20px;">
+                                            📥 นำเข้าไฟล์ข้อสอบ (Import JSON)
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                </div>
+            </section>
+
+            <!-- 3. EXAM SIMULATOR VIEW -->
+            <section id="exam-view" class="d-none">
+                <div class="exam-layout">
+                    <!-- Left: Current Question Card -->
+                    <div class="exam-panel">
+                        <div class="exam-header">
+                            <div class="exam-title-info">
+                                <span class="badge" id="exam-question-subject">วิชา...</span>
+                                <h2 id="exam-question-number-title">ข้อที่ 1 / 15</h2>
+                            </div>
+                            <button id="exam-mark-review-btn" class="mark-review-btn">
+                                🏳️ ปักหมุดทบทวน
+                            </button>
+                        </div>
+
+                        <div id="exam-question-text" class="question-text">
+                            คำถามกำลังโหลด...
+                        </div>
+
+                        <div class="choices-list" id="exam-choices-container">
+                            <!-- Shuffled choice items rendered here -->
+                        </div>
+
+                        <div class="exam-actions">
+                            <button id="exam-prev-btn" class="action-btn prev">ข้อก่อนหน้า</button>
+                            <button id="exam-next-btn" class="action-btn next">ข้อถัดไป</button>
+                            <button id="exam-submit-btn" class="action-btn submit d-none">ส่งกระดาษคำตอบ</button>
+                        </div>
+                    </div>
+
+                    <!-- Right: Sticky Timer & Sidebar Controls -->
+                    <div class="exam-sidebar">
+                        <div class="timer-card" id="exam-timer-card">
+                            <div class="timer-label">⏰ เวลาคงเหลือ</div>
+                            <div class="timer-val" id="exam-timer-val">03:00:00</div>
+                        </div>
+
+                        <button id="exam-sidebar-submit-btn" class="primary-btn submit-glow-btn" style="margin-bottom: 24px; padding: 12px 16px; font-size: 14px;">
+                            ส่งคำตอบทั้งหมด
+                        </button>
+
+                        <div class="sidebar-section-title">🧭 แผงควบคุมข้อสอบ</div>
+                        <div class="question-grid" id="exam-question-grid">
+                            <!-- Dynamic small buttons to jump to questions -->
+                        </div>
+
+                        <div class="legend">
+                            <div class="legend-item">
+                                <div class="legend-color unanswered"></div>
+                                <span>ยังไม่ได้ทำ</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color active"></div>
+                                <span>ข้อปัจจุบัน</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color answered"></div>
+                                <span>ทำแล้ว</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color review"></div>
+                                <span>ปักหมุดทบทวน</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 4. RESULTS VIEW -->
+            <section id="results-view" class="d-none">
+                <div class="exam-layout">
+                    <!-- Left: Current Question Review Details -->
+                    <div class="exam-panel">
+                        <div class="exam-header">
+                            <div class="exam-title-info">
+                                <span class="badge" id="result-question-subject">วิชา...</span>
+                                <h2 id="result-question-number-title">ข้อที่ 1 / 15</h2>
+                            </div>
+                            <span class="review-status" id="result-question-status-badge">✅ ตอบถูกต้อง</span>
+                        </div>
+
+                        <div id="result-question-text" class="question-text">
+                            คำถาม...
+                        </div>
+
+                        <div class="choices-list" id="result-choices-container">
+                            <!-- Option blocks with green/red borders/bg -->
+                        </div>
+
+                        <div class="explanation-box" id="result-explanation-box">
+                            <div class="explanation-title" id="result-explanation-title">💡 คำอธิบายเฉลย: ตอบข้อ A</div>
+                            <div class="explanation-text" id="result-explanation-text">คำอธิบายรายละเอียด...</div>
+                        </div>
+                        
+                        <div class="exam-actions" style="margin-top: 24px;">
+                            <button id="result-prev-btn" class="action-btn prev">ข้อก่อนหน้า</button>
+                            <button id="result-next-btn" class="action-btn next">ข้อถัดไป</button>
+                        </div>
+                    </div>
+
+                    <!-- Right: Sticky Sidebar with Score Breakdown and Question Navigation -->
+                    <div class="exam-sidebar">
+                        <div class="timer-card" id="result-timer-card" style="border-color: var(--primary-color);">
+                            <div class="timer-label" id="result-status-text">ผ่านการเกณฑ์ทดสอบ!</div>
+                            <div class="timer-val" id="result-score-ratio" style="font-size: 32px; color: var(--primary-color);">12/15</div>
+                            <div style="font-size: 13px; color: var(--text-sub); margin-top: 4px;" id="result-score-percent">ร้อยละ 80%</div>
+                        </div>
+
+                        <button id="result-back-dashboard-btn" class="primary-btn" style="margin-bottom: 24px;">
+                            🏠 กลับสู่หน้าหลัก
+                        </button>
+
+                        <div class="sidebar-section-title">📊 สถิติแยกรายวิชา</div>
+                        <div id="result-subject-breakdown-container" style="margin-bottom: 20px; font-size: 12px;">
+                            <!-- Progress bars -->
+                        </div>
+
+                        <div class="sidebar-section-title">🧭 ตรวจกระดาษคำตอบ</div>
+                        <div class="question-grid" id="result-question-grid">
+                            <!-- Circular buttons: correct (light green), incorrect (light red), active (border) -->
+                        </div>
+
+                        <div class="legend" style="margin-top: 16px; padding-top: 12px;">
+                            <div class="legend-item">
+                                <div class="legend-color" style="background: rgba(75, 181, 67, 0.15); border: 1.5px solid #2e7d32;"></div>
+                                <span>ตอบถูก (Correct)</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color" style="background: rgba(201, 76, 76, 0.15); border: 1.5px solid var(--accent-color);"></div>
+                                <span>ตอบผิด / ไม่ตอบ (Incorrect)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            
+        </main>
+    </div>
+
+    <!-- MODAL 1: ADD/EDIT QUESTION -->
+    <div id="question-modal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close" id="question-modal-close">×</button>
+            <h3 id="question-modal-title" style="margin-bottom: 24px; font-size: 20px;">เพิ่มข้อสอบ</h3>
+            <form id="question-modal-form">
+                <input type="hidden" id="modal-q-id">
+                
+                <div class="form-group">
+                    <label for="modal-q-subject">รายวิชา (เลือกจากรายวิชาที่ตั้งค่าไว้)</label>
+                    <select id="modal-q-subject" class="form-input" required></select>
+                </div>
+
+                <div class="form-group">
+                    <label for="modal-q-text">โจทย์คำถาม</label>
+                    <textarea id="modal-q-text" class="form-input" rows="3" required placeholder="พิมพ์ตัวคำถามที่นี่..."></textarea>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                    <div class="form-group">
+                        <label for="modal-q-opt-a">ตัวเลือก ก (Option A)</label>
+                        <input type="text" id="modal-q-opt-a" class="form-input" required placeholder="ตัวเลือก ก">
+                    </div>
+                    <div class="form-group">
+                        <label for="modal-q-opt-b">ตัวเลือก ข (Option B)</label>
+                        <input type="text" id="modal-q-opt-b" class="form-input" required placeholder="ตัวเลือก ข">
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                    <div class="form-group">
+                        <label for="modal-q-opt-c">ตัวเลือก ค (Option C)</label>
+                        <input type="text" id="modal-q-opt-c" class="form-input" required placeholder="ตัวเลือก ค">
+                    </div>
+                    <div class="form-group">
+                        <label for="modal-q-opt-d">ตัวเลือก ง (Option D)</label>
+                        <input type="text" id="modal-q-opt-d" class="form-input" required placeholder="ตัวเลือก ง">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="modal-q-correct">เฉลยข้อที่ถูกต้อง</label>
+                    <select id="modal-q-correct" class="form-input" required>
+                        <option value="A">ก (Option A)</option>
+                        <option value="B">ข (Option B)</option>
+                        <option value="C">ค (Option C)</option>
+                        <option value="D">ง (Option D)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="modal-q-explanation">อธิบายคำเฉลย (ทำไมถึงตอบข้อนี้)</label>
+                    <textarea id="modal-q-explanation" class="form-input" rows="3" placeholder="อธิบายเฉลยที่ถูกต้องและเหตุผลในข้อนี้..."></textarea>
+                </div>
+
+                <button type="submit" class="primary-btn">💾 บันทึกข้อสอบ</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: ADD/EDIT MEMBER -->
+    <div id="member-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 450px;">
+            <button class="modal-close" id="member-modal-close">×</button>
+            <h3 id="member-modal-title" style="margin-bottom: 24px; font-size: 20px;">เพิ่มสมาชิกใหม่</h3>
+            <form id="member-modal-form">
+                <input type="hidden" id="modal-m-mode" value="add"> <!-- add / edit -->
+                
+                <div class="form-group">
+                    <label for="modal-m-email">Gmail สมาชิก</label>
+                    <input type="email" id="modal-m-email" class="form-input" required placeholder="student@gmail.com">
+                </div>
+
+                <div class="form-group">
+                    <label for="modal-m-name">ชื่อ-นามสกุลผู้สอบ</label>
+                    <input type="text" id="modal-m-name" class="form-input" required placeholder="ส.ต. ประยุทธ์ อดทน">
+                </div>
+
+                <div class="form-group">
+                    <label for="modal-m-password">รหัสผ่าน</label>
+                    <input type="text" id="modal-m-password" class="form-input" required placeholder="กำหนดรหัสผ่าน">
+                </div>
+
+                <div class="form-group">
+                    <label for="modal-m-role">บทบาทในระบบ</label>
+                    <select id="modal-m-role" class="form-input" required>
+                        <option value="candidate">Candidate (ผู้สอบ)</option>
+                        <option value="admin">Admin (ผู้ดูแลระบบ)</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="primary-btn">💾 บันทึกข้อมูลสมาชิก</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 3: IMAGE CROPPER -->
+    <div id="cropper-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 500px; padding: 24px;">
+            <button class="modal-close" id="cropper-modal-close">×</button>
+            <h3 style="margin-bottom: 16px; font-size: 18px;">✂️ ปรับขนาดและตัดครอบรูปโปรไฟล์</h3>
+            <div style="width: 100%; height: 320px; overflow: hidden; background: #121212; border-radius: var(--radius-sm); margin-bottom: 20px; display: flex; align-items: center; justify-content: center;">
+                <img id="cropper-image" style="max-width: 100%; max-height: 100%; display: block;" alt="To Crop">
+            </div>
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                <button type="button" class="secondary-btn" id="cropper-cancel-btn" style="margin: 0; width: auto; padding: 10px 20px;">ยกเลิก</button>
+                <button type="button" class="primary-btn" id="cropper-confirm-btn" style="width: auto; padding: 10px 20px;">✂️ ยืนยันตัดรูป</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 4: EXAM INSTRUCTIONS & QUOTA INFO -->
+    <div id="instruction-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 500px; padding: 24px;">
+            <button class="modal-close" id="instruction-modal-close">×</button>
+            <h3 style="margin-bottom: 16px; font-size: 20px; display: flex; align-items: center; gap: 8px; border: none; padding: 0;">
+                📝 คำชี้แจงการทำข้อสอบจำลอง
+            </h3>
+            <p style="color: var(--text-sub); margin-bottom: 20px; font-size: 14px; line-height: 1.6; text-align: left;">
+                ระบบจะสุ่มดึงข้อสอบจากรายวิชาต่างๆ ตามโควตาที่แอดมินกำหนดไว้ และทำการคละทั้งลำดับข้อสอบรวมถึงลำดับตัวเลือกไม่ให้ซ้ำกันในแต่ละรอบ
+            </p>
+            
+            <div style="background: var(--bg-main); padding: 16px; border-radius: var(--radius-sm); margin-bottom: 24px; border: 1px solid var(--border-color); text-align: left;">
+                <h4 style="margin-bottom: 10px; font-size: 14px; font-weight: 700; color: var(--primary-color);">📊 แผนการจัดสรรข้อสอบปัจจุบัน:</h4>
+                <ul id="dashboard-quota-list" style="padding-left: 20px; font-size: 14px; line-height: 1.6; margin-bottom: 12px; text-align: left;">
+                    <!-- Dynamic quota config representation -->
+                </ul>
+                <div id="dashboard-total-questions-info" style="font-weight: 700; font-size: 14px; color: var(--text-main);">
+                    จำนวนข้อสอบรวมทั้งสิ้น: -- ข้อ
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                <button type="button" class="secondary-btn" id="instruction-cancel-btn" style="margin: 0; width: auto; padding: 10px 20px;">ยกเลิก</button>
+                <button type="button" class="primary-btn submit-glow-btn" id="instruction-start-btn" style="width: auto; padding: 10px 20px; margin: 0;">📝 ยืนยันเริ่มทำข้อสอบ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST MESSAGES -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- SCRIPT MODULES -->
+    <script type="module" src="js/app.js?v=5"></script>
+</body>
+</html>
