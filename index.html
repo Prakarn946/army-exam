@@ -11,9 +11,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
     <!-- Chart.js for dashboard progress chart -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- SheetJS and Mammoth for Word/Excel import -->
+    <!-- SheetJS, Mammoth and PDF.js for Word/Excel/PDF import -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
 </head>
 <body>
     <div id="app">
@@ -224,7 +225,6 @@
                                 </div>
                                 <div style="display: flex; justify-content: space-between; font-size: 11px; margin-top: 6px; color: var(--text-sub); font-weight: 500;">
                                     <span id="db-capacity-text">0.00 KB</span>
-                                    <span>เต็ม 5.00 MB</span>
                                 </div>
                             </div>
 
@@ -402,12 +402,13 @@
                                 </button>
                             </div>
 
-                            <!-- Word/Excel File Card -->
+                            <!-- Word/Excel/PDF File Card -->
                             <div class="dashboard-card" style="background: var(--bg-main); margin-bottom: 24px;">
-                                <h4 style="margin-bottom: 8px; font-weight: 700;">📄 นำเข้าจากไฟล์ Word (.docx) หรือ Excel (.xlsx / .xls)</h4>
+                                <h4 style="margin-bottom: 8px; font-weight: 700;">📄 นำเข้าจากไฟล์ Word (.docx), Excel (.xlsx / .xls) หรือ PDF (.pdf)</h4>
                                 <p style="font-size: 13px; color: var(--text-sub); margin-bottom: 16px; line-height: 1.5;">
                                     1. <strong>สำหรับไฟล์ Excel (.xlsx / .xls):</strong> แถวแรกระบุชื่อคอลัมน์ (วิชา, คำถาม, ก, ข, ค, ง, เฉลย, คำอธิบาย) หรือใช้ลำดับคอลัมน์มาตรฐาน<br>
-                                    2. <strong>สำหรับไฟล์ Word (.docx):</strong> แยกโจทย์ ตัวเลือก ก-ง และเฉลยโดยอัตโนมัติ (สามารถระบุบรรทัด <code>วิชา: [ชื่อวิชา]</code> เพื่อตั้งวิชาได้)
+                                    2. <strong>สำหรับไฟล์ Word (.docx):</strong> แยกโจทย์ ตัวเลือก ก-ง และเฉลยโดยอัตโนมัติ (สามารถระบุบรรทัด <code>วิชา: [ชื่อวิชา]</code> เพื่อตั้งวิชาได้)<br>
+                                    3. <strong>สำหรับไฟล์ PDF (.pdf):</strong> ระบบจะแยกข้อความ โจทย์ ตัวเลือก ก-ง และเฉลยโดยอัตโนมัติเช่นเดียวกับไฟล์ Word
                                 </p>
                                 <div class="form-group" style="max-width: 320px; margin-bottom: 16px;">
                                     <label for="import-file-subject-select" style="font-weight: 700;">📂 เลือกวิชาสำหรับจัดเก็บข้อมูลนำเข้า</label>
@@ -417,11 +418,11 @@
                                 </div>
                                 
                                 <div class="form-group" style="margin-bottom: 20px;">
-                                    <label style="font-weight: 700;">📁 เลือกไฟล์ที่ต้องการนำเข้า (.docx, .xlsx, .xls)</label>
+                                    <label style="font-weight: 700;">📁 เลือกไฟล์ที่ต้องการนำเข้า (.docx, .xlsx, .xls, .pdf)</label>
                                     <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
-                                        <input type="file" id="import-doc-excel-file" accept=".docx,.xlsx,.xls" class="d-none">
+                                        <input type="file" id="import-doc-excel-file" accept=".docx,.xlsx,.xls,.pdf" class="d-none">
                                         <button type="button" class="secondary-btn" id="import-doc-excel-trigger" style="width: auto; margin: 0; padding: 10px 20px;">
-                                            📁 เลือกไฟล์ Word / Excel
+                                            📁 เลือกไฟล์ Word / Excel / PDF
                                         </button>
                                         <span id="import-selected-filename" style="font-size: 13px; color: var(--text-sub);">ไม่ได้เลือกไฟล์ใดๆ</span>
                                     </div>

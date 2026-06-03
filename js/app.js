@@ -2702,8 +2702,60 @@ function bindImportExportElements() {
                         });
                 };
                 reader.readAsArrayBuffer(file);
+            } else if (ext === 'pdf') {
+                reader.onload = (evt) => {
+                    const typedarray = new Uint8Array(evt.target.result);
+                    const pdfjsLib = window['pdfjs-dist/build/pdf'] || window.pdfjsLib;
+                    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+                    
+                    pdfjsLib.getDocument(typedarray).promise.then(function(pdf) {
+                        let maxPages = pdf.numPages;
+                        let countPromises = [];
+                        for (let j = 1; j <= maxPages; j++) {
+                            countPromises.push(
+                                pdf.getPage(j).then(function(page) {
+                                    return page.getTextContent().then(function(textContent) {
+                                        let lastY;
+                                        let pageText = '';
+                                        for (let item of textContent.items) {
+                                            const currentY = item.transform[5];
+                                            if (lastY !== undefined && Math.abs(currentY - lastY) > 5) {
+                                                pageText += '\n';
+                                            } else if (pageText !== '' && !pageText.endsWith('\n') && !item.str.startsWith(' ') && !pageText.endsWith(' ')) {
+                                                pageText += ' ';
+                                            }
+                                            pageText += item.str;
+                                            lastY = currentY;
+                                        }
+                                        return pageText;
+                                    });
+                                })
+                            );
+                        }
+                        return Promise.all(countPromises);
+                    }).then(function(pageTexts) {
+                        const text = pageTexts.join('\n');
+                        const defaultSubject = fileSubjectSelect ? fileSubjectSelect.value : 'all';
+                        const questions = parseWordText(text, defaultSubject);
+                        if (questions.length === 0) {
+                            showToast('ไม่พบข้อมูลคำถามในไฟล์ PDF นี้ กรุณาตรวจสอบรูปแบบเอกสาร', 'error');
+                            return;
+                        }
+                        // Tag with source file
+                        questions.forEach(q => {
+                            q.sourceFile = file.name;
+                        });
+                        tempImportFileName = file.name;
+                        renderFileImportPreview(questions);
+                        showToast(`วิเคราะห์ไฟล์ PDF สำเร็จ! พบข้อสอบ ${questions.length} ข้อ กรุณาตรวจด้านล่าง`);
+                    }).catch(function(err) {
+                        console.error(err);
+                        showToast('เกิดข้อผิดพลาดในการอ่านไฟล์ PDF: ' + err.message, 'error');
+                    });
+                };
+                reader.readAsArrayBuffer(file);
             } else {
-                showToast('รูปแบบไฟล์ไม่รองรับ รองรับเฉพาะ .docx, .xlsx, .xls เท่านั้น', 'error');
+                showToast('รูปแบบไฟล์ไม่รองรับ รองรับเฉพาะ .docx, .xlsx, .xls, .pdf เท่านั้น', 'error');
                 fileInput.value = '';
                 fileNameSpan.textContent = 'ไม่ได้เลือกไฟล์ใดๆ';
             }
