@@ -11,6 +11,15 @@ let realtimeIntervalId = null;
 let appendRealtimeActivityLog = null;
 let activeQualificationScope = 'ม.ปลาย';
 
+// Update login subtitle from default qualification config (ม.ปลาย)
+function updateLoginSubtitle() {
+    const config = getConfig('ม.ปลาย');
+    const loginSubtitleEl = document.getElementById('login-subtitle');
+    if (loginSubtitleEl) {
+        loginSubtitleEl.textContent = config.loginSubtitle || 'จำลองการสอบออนไลน์กองทัพบก';
+    }
+}
+
 
 // UI Toast Helper
 function showToast(message, type = 'success') {
@@ -143,6 +152,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         initScope = userOnLoad.role === 'admin' ? activeQualificationScope : userOnLoad.qualification;
     }
     await initStore(initScope);
+    
+    // Set subtitle in login view
+    updateLoginSubtitle();
     
     // Start real-time heartbeat sync loop (every 8 seconds)
     setInterval(sendHeartbeat, 8000);
@@ -1726,6 +1738,7 @@ function renderAdminSubjectConfigs() {
 
     // Fill duration
     document.getElementById('config-duration').value = config.durationMinutes || 180;
+    document.getElementById('config-login-subtitle').value = config.loginSubtitle || 'จำลองการสอบออนไลน์กองทัพบก';
 
     // Handle Form Submit
     document.getElementById('admin-config-form').onsubmit = (e) => {
@@ -1734,6 +1747,7 @@ function renderAdminSubjectConfigs() {
         const rows = container.querySelectorAll('.config-subject-row');
         const newConfig = {
             durationMinutes: parseInt(document.getElementById('config-duration').value) || 180,
+            loginSubtitle: document.getElementById('config-login-subtitle').value.trim() || 'จำลองการสอบออนไลน์กองทัพบก',
             subjectOrder: []
         };
 
@@ -1783,6 +1797,15 @@ function renderAdminSubjectConfigs() {
 
         // Save new config
         saveConfig(newConfig, activeQualificationScope);
+
+        // Also synchronize the loginSubtitle globally to the other qualification so they stay in sync
+        const otherQual = activeQualificationScope === 'ม.ปลาย' ? 'ป.ตรี' : 'ม.ปลาย';
+        const otherConfig = getConfig(otherQual);
+        otherConfig.loginSubtitle = newConfig.loginSubtitle;
+        saveConfig(otherConfig, otherQual);
+
+        // Update UI login subtitle immediately
+        updateLoginSubtitle();
 
         // Save updated questions if renamed
         if (questionsUpdated) {

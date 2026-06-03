@@ -428,7 +428,8 @@ const DEFAULT_CONFIG = {
     'ภาษาอังกฤษ': 5,
     'ความรู้ทั่วไป': 5,
     'durationMinutes': 180, // 3 hours in minutes
-    'subjectOrder': ['คณิตศาสตร์', 'ภาษาอังกฤษ', 'ความรู้ทั่วไป']
+    'subjectOrder': ['คณิตศาสตร์', 'ภาษาอังกฤษ', 'ความรู้ทั่วไป'],
+    'loginSubtitle': 'จำลองการสอบออนไลน์กองทัพบก'
 };
 
 export let currentActiveQualification = 'ม.ปลาย';
