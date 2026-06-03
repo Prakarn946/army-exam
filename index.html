@@ -220,9 +220,21 @@
                             </div>
                         </div>
 
+                            <!-- Login Subtitle Configuration Widget -->
+                            <div class="admin-widget-card" style="margin-top: 24px; padding: 16px; background: var(--bg-card); border: 1.5px solid var(--border-color); border-radius: var(--radius-sm); box-shadow: 0 4px 12px var(--shadow-color);">
+                                <div style="font-weight: 700; font-size: 13px; margin-bottom: 10px; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+                                    📝 ข้อความใต้โลโก้หน้าล็อกอิน
+                                </div>
+                                <div class="form-group" style="margin-bottom: 8px;">
+                                    <input type="text" id="config-login-subtitle" class="form-input" placeholder="จำลองการสอบออนไลน์กองทัพบก" style="font-size: 12px; padding: 8px; width: 100%;">
+                                </div>
+                                <button id="save-login-subtitle-btn" class="primary-btn" style="width: 100%; padding: 8px; font-size: 12px; font-weight: 600; margin: 0; border-radius: var(--radius-xs);">
+                                    💾 บันทึกข้อความ
+                                </button>
+                            </div>
                     
                             <!-- Database Capacity Widget -->
-                            <div class="admin-widget-card" style="margin-top: 24px; padding: 16px; background: var(--bg-card); border: 1.5px solid var(--border-color); border-radius: var(--radius-sm); box-shadow: 0 4px 12px var(--shadow-color);">
+                            <div class="admin-widget-card" style="margin-top: 16px; padding: 16px; background: var(--bg-card); border: 1.5px solid var(--border-color); border-radius: var(--radius-sm); box-shadow: 0 4px 12px var(--shadow-color);">
                                 <div style="font-weight: 700; font-size: 13px; margin-bottom: 10px; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
                                     🗄️ ความจุฐานข้อมูล
                                 </div>
@@ -315,15 +327,9 @@
                                 <div class="config-grid" id="admin-config-subjects-container">
                                     <!-- Dynamic subject count inputs -->
                                 </div>
-                                <div style="display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 20px;">
-                                    <div class="form-group" style="flex: 1; min-width: 200px; background: var(--bg-main); padding: 16px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); margin-bottom: 0;">
-                                        <label for="config-duration" style="font-weight: 700;">⏰ เวลาจำกัดการสอบ (นาที)</label>
-                                        <input type="number" id="config-duration" class="form-input" min="5" max="360" required>
-                                    </div>
-                                    <div class="form-group" style="flex: 2; min-width: 300px; background: var(--bg-main); padding: 16px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); margin-bottom: 0;">
-                                        <label for="config-login-subtitle" style="font-weight: 700;">📝 ข้อความใต้โลโก้หน้าล็อกอิน</label>
-                                        <input type="text" id="config-login-subtitle" class="form-input" placeholder="จำลองการสอบออนไลน์กองทัพบก">
-                                    </div>
+                                <div class="form-group" style="max-width: 320px; background: var(--bg-main); padding: 16px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                                    <label for="config-duration" style="font-weight: 700;">⏰ เวลาจำกัดการสอบ (นาที)</label>
+                                    <input type="number" id="config-duration" class="form-input" min="5" max="360" required>
                                 </div>
                                 <button type="submit" class="primary-btn" style="max-width: 200px;">💾 บันทึกการตั้งค่า</button>
                             </form>
