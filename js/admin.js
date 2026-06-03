@@ -97,7 +97,7 @@ function mapCSVRowsToQuestions(rows) {
 }
 
 // Fetch questions from public Google Sheet CSV link
-export async function syncFromGoogleSheets(url, mode = 'append', subjectFilter = 'all') {
+export async function syncFromGoogleSheets(url, mode = 'append', subjectFilter = 'all', qualification) {
     // Convert normal Google Sheets share link to direct CSV export link if applicable
     let csvUrl = url.trim();
     if (csvUrl.includes('docs.google.com/spreadsheets')) {
@@ -123,9 +123,10 @@ export async function syncFromGoogleSheets(url, mode = 'append', subjectFilter =
     const rows = parseCSV(text);
     let parsedQuestions = mapCSVRowsToQuestions(rows);
 
-    // Tag each question with sourceFile
+    // Tag each question with sourceFile and qualification
     parsedQuestions.forEach(q => {
         q.sourceFile = "Google Sheets Sync";
+        q.qualification = qualification;
     });
 
     // If targeting a specific subject, override all imported questions' subject to subjectFilter
@@ -169,13 +170,13 @@ export async function syncFromGoogleSheets(url, mode = 'append', subjectFilter =
         }
     }
 
-    saveQuestions(finalQuestions);
-    updateSubjectConfigs();
+    saveQuestions(finalQuestions, qualification);
+    updateSubjectConfigs(qualification);
     return parsedQuestions.length;
 }
 
 // Update subject configuration keys if new subjects are added
-export function updateSubjectConfigs() {
+export function updateSubjectConfigs(qualification) {
     const questions = getQuestions();
     const config = getConfig();
     
@@ -194,13 +195,14 @@ export function updateSubjectConfigs() {
     });
 
     if (updated) {
-        saveConfig(config);
+        saveConfig(config, qualification);
     }
 }
 
 // Add/Update individual question
-export function saveQuestionItem(questionData) {
+export function saveQuestionItem(questionData, qualification) {
     const questions = getQuestions();
+    const qScope = qualification || questionData.qualification;
     
     if (questionData.id) {
         // Edit mode
@@ -216,35 +218,35 @@ export function saveQuestionItem(questionData) {
         questions.push(questionData);
     }
 
-    saveQuestions(questions);
-    updateSubjectConfigs();
+    saveQuestions(questions, qScope);
+    updateSubjectConfigs(qScope);
     return questionData;
 }
 
 // Delete question
-export function deleteQuestionItem(id) {
+export function deleteQuestionItem(id, qualification) {
     const questions = getQuestions();
     const updated = questions.filter(q => q.id !== id);
-    saveQuestions(updated);
-    updateSubjectConfigs();
+    saveQuestions(updated, qualification);
+    updateSubjectConfigs(qualification);
 }
 
 // Save Subject Config Questions Limit
-export function saveSubjectConfig(subject, count) {
+export function saveSubjectConfig(subject, count, qualification) {
     const config = getConfig();
     config[subject] = parseInt(count) || 0;
-    saveConfig(config);
+    saveConfig(config, qualification);
 }
 
 // Save Duration Limit
-export function saveExamDuration(minutes) {
+export function saveExamDuration(minutes, qualification) {
     const config = getConfig();
     config.durationMinutes = parseInt(minutes) || 180;
-    saveConfig(config);
+    saveConfig(config, qualification);
 }
 
 // Add Member/User
-export function addMember(gmail, password, name, role = 'candidate') {
+export function addMember(gmail, password, name, role = 'candidate', qualification) {
     const users = getUsers();
     const exists = users.some(u => u.gmail.toLowerCase() === gmail.toLowerCase());
     
@@ -256,29 +258,30 @@ export function addMember(gmail, password, name, role = 'candidate') {
         gmail: gmail.toLowerCase(),
         password: password,
         name: name,
-        role: role
+        role: role,
+        qualification: qualification
     };
 
     users.push(newUser);
-    saveUsers(users);
+    saveUsers(users, qualification);
     return newUser;
 }
 
 // Update Member/User
-export function updateMember(gmail, updateData) {
+export function updateMember(gmail, updateData, qualification) {
     const users = getUsers();
     const index = users.findIndex(u => u.gmail.toLowerCase() === gmail.toLowerCase());
     if (index > -1) {
         users[index] = { ...users[index], ...updateData };
-        saveUsers(users);
+        saveUsers(users, qualification);
         return users[index];
     }
     throw new Error('ไม่พบข้อมูลสมาชิกนี้');
 }
 
 // Delete Member/User
-export function deleteMember(gmail) {
+export function deleteMember(gmail, qualification) {
     const users = getUsers();
     const updated = users.filter(u => u.gmail.toLowerCase() !== gmail.toLowerCase());
-    saveUsers(updated);
+    saveUsers(updated, qualification);
 }

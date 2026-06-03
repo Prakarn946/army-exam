@@ -441,9 +441,10 @@ let localCache = {
 };
 
 // Sync from backend
-export async function syncFromBackend() {
+export async function syncFromBackend(qualification) {
     try {
-        const response = await fetch('/api/db');
+        const url = qualification ? `/api/db?qualification=${encodeURIComponent(qualification)}` : '/api/db';
+        const response = await fetch(url);
         if (response.ok) {
             const data = await response.json();
             localCache.questions = data.questions || [];
@@ -478,9 +479,9 @@ export function getDbSizeBytes() {
 }
 
 // Initialize Store
-export async function initStore() {
+export async function initStore(qualification) {
     // 1. Sync from server
-    const synced = await syncFromBackend();
+    const synced = await syncFromBackend(qualification);
     
     // 2. Only seed defaults if:
     //    - We are online AND the server returned completely empty questions AND empty users (first time fresh server install)
@@ -515,10 +516,11 @@ export function getQuestions() {
     return localCache.questions.length > 0 ? localCache.questions : (JSON.parse(localStorage.getItem(STORE_KEYS.QUESTIONS)) || []);
 }
 
-export function saveQuestions(questions) {
+export function saveQuestions(questions, qualification) {
     localCache.questions = questions;
     localStorage.setItem(STORE_KEYS.QUESTIONS, JSON.stringify(questions));
-    fetch('/api/save_questions', {
+    const url = qualification ? `/api/save_questions?qualification=${encodeURIComponent(qualification)}` : '/api/save_questions';
+    fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(questions)
@@ -559,10 +561,11 @@ export function getUsers() {
     return localCache.users.length > 0 ? localCache.users : (JSON.parse(localStorage.getItem(STORE_KEYS.USERS)) || []);
 }
 
-export function saveUsers(users) {
+export function saveUsers(users, qualification) {
     localCache.users = users;
     localStorage.setItem(STORE_KEYS.USERS, JSON.stringify(users));
-    fetch('/api/save_users', {
+    const url = qualification ? `/api/save_users?qualification=${encodeURIComponent(qualification)}` : '/api/save_users';
+    fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(users)
@@ -574,10 +577,11 @@ export function getConfig() {
     return (localCache.config && Object.keys(localCache.config).length > 0) ? localCache.config : (JSON.parse(localStorage.getItem(STORE_KEYS.CONFIG)) || DEFAULT_CONFIG);
 }
 
-export function saveConfig(config) {
+export function saveConfig(config, qualification) {
     localCache.config = config;
     localStorage.setItem(STORE_KEYS.CONFIG, JSON.stringify(config));
-    fetch('/api/save_config', {
+    const url = qualification ? `/api/save_config?qualification=${encodeURIComponent(qualification)}` : '/api/save_config';
+    fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config)
@@ -589,10 +593,11 @@ export function getAttempts() {
     return localCache.attempts.length > 0 ? localCache.attempts : (JSON.parse(localStorage.getItem(STORE_KEYS.ATTEMPTS)) || []);
 }
 
-export function saveAttempts(attempts) {
+export function saveAttempts(attempts, qualification) {
     localCache.attempts = attempts;
     localStorage.setItem(STORE_KEYS.ATTEMPTS, JSON.stringify(attempts));
-    fetch('/api/save_attempts', {
+    const url = qualification ? `/api/save_attempts?qualification=${encodeURIComponent(qualification)}` : '/api/save_attempts';
+    fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(attempts)
@@ -602,7 +607,7 @@ export function saveAttempts(attempts) {
 export function addAttempt(attempt) {
     const attempts = getAttempts();
     attempts.unshift(attempt); // newest first
-    saveAttempts(attempts);
+    saveAttempts(attempts, attempt.qualification);
     
     // Send single attempt to server to prevent overwriting concurrency issues
     fetch('/api/add_attempt', {

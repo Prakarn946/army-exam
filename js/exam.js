@@ -1,4 +1,5 @@
 import { getQuestions, getConfig, addAttempt } from './store.js?v=5';
+import { getCurrentUser } from './auth.js?v=5';
 
 const ACTIVE_EXAM_KEY = 'army_exam_active_session';
 
@@ -176,6 +177,9 @@ export function submitExam(userGmail, userName) {
     const totalQuestions = questions.length;
     const totalPercentage = totalQuestions > 0 ? Math.round((totalScore / totalQuestions) * 100) : 0;
 
+    const currentUser = getCurrentUser();
+    const qualification = currentUser ? currentUser.qualification : 'ม.ปลาย';
+
     const attemptResult = {
         id: 'att_' + Date.now(),
         userGmail: userGmail,
@@ -185,7 +189,8 @@ export function submitExam(userGmail, userName) {
         totalScore: totalScore,
         percentage: totalPercentage,
         subjectStats: subjectStats,
-        questionResults: questionResults
+        questionResults: questionResults,
+        qualification: qualification
     };
 
     // Save attempt in store

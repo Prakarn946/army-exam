@@ -9,6 +9,7 @@ let profileCropperInstance = null;
 let progressChartInstance = null;
 let realtimeIntervalId = null;
 let appendRealtimeActivityLog = null;
+let activeQualificationScope = 'ม.ปลาย';
 
 
 // UI Toast Helper
@@ -106,17 +107,19 @@ function showView(viewId) {
 // Periodic background sync from server
 async function runPeriodicSync() {
     try {
-        const synced = await syncFromBackend();
-        if (synced) {
-            const user = getCurrentUser();
-            if (user) {
-                if (user.role === 'admin') {
-                    renderLeaderboard();
-                    renderDatabaseCapacity();
-                } else {
-                    if (window.currentActiveView === 'dashboard-view') {
-                        renderAttemptsHistory(user.gmail);
-                    }
+        const user = getCurrentUser();
+        let scope = undefined;
+        if (user) {
+            scope = user.role === 'admin' ? activeQualificationScope : user.qualification;
+        }
+        const synced = await syncFromBackend(scope);
+        if (synced && user) {
+            if (user.role === 'admin') {
+                renderLeaderboard();
+                renderDatabaseCapacity();
+            } else {
+                if (window.currentActiveView === 'dashboard-view') {
+                    renderAttemptsHistory(user.gmail);
                 }
             }
         }
@@ -128,7 +131,12 @@ async function runPeriodicSync() {
 // App Initialization
 document.addEventListener('DOMContentLoaded', async () => {
     // 1. Init Database Store
-    await initStore();
+    const userOnLoad = getCurrentUser();
+    let initScope = undefined;
+    if (userOnLoad) {
+        initScope = userOnLoad.role === 'admin' ? activeQualificationScope : userOnLoad.qualification;
+    }
+    await initStore(initScope);
     
     // Start real-time heartbeat sync loop (every 8 seconds)
     setInterval(sendHeartbeat, 8000);
@@ -206,7 +214,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (resetLeaderboardBtn) {
         resetLeaderboardBtn.addEventListener('click', () => {
             if (confirm('⚠️ คุณต้องการรีเซ็ตประวัติคะแนนสอบของทุกคนใช่หรือไม่?\nการดำเนินการนี้จะล้างบอร์ดคะแนนสูงสุดทั้งหมดกลับเป็นค่าเริ่มต้น!')) {
-                saveAttempts([]);
+                saveAttempts([], activeQualificationScope);
                 showToast('🔄 รีเซ็ตประวัติคะแนนสูงสุดเรียบร้อยแล้ว');
                 renderLeaderboard();
             }
@@ -364,10 +372,17 @@ function checkSessionAndRedirect() {
 // ==========================================
 // DASHBOARD CONTROLLERS
 // ==========================================
-function goToDashboard() {
+async function goToDashboard() {
     showView('dashboard-view');
     const user = getCurrentUser();
     if (!user) return;
+    
+    // Sync qualification scoped data first!
+    if (user.role === 'admin') {
+        await syncFromBackend(activeQualificationScope);
+    } else {
+        await syncFromBackend(user.qualification);
+    }
     
     const candidateContainer = document.getElementById('candidate-dashboard-container');
     const adminContainer = document.getElementById('admin-dashboard-container');
@@ -1378,16 +1393,125 @@ function showExamResults(result) {
 // ADMIN DASHBOARD MODULE
 // ==========================================
 function initAdminDashboard() {
-    // Select default active tab config (Real-time Monitor)
+    // Select default active tab config (Real-time Monitor) and style it active
+    const realtimeTab = document.querySelector('[data-tab="admin-realtime"]');
+    if (realtimeTab) {
+        document.querySelectorAll('.admin-menu-item').forEach(b => {
+            b.classList.remove('active');
+            b.style.background = '';
+            b.style.color = '';
+            b.style.border = '';
+            b.style.boxShadow = '';
+        });
+        realtimeTab.classList.add('active');
+        realtimeTab.style.background = 'rgba(0, 210, 255, 0.15)';
+        realtimeTab.style.color = '#00d2ff';
+        realtimeTab.style.border = '1px solid rgba(0, 210, 255, 0.4)';
+        realtimeTab.style.boxShadow = '0 0 8px rgba(0, 210, 255, 0.3)';
+    }
     switchAdminTab('admin-realtime');
+
+    // Bind accordion toggles once
+    const parentHS = document.getElementById('parent-highschool');
+    const parentBach = document.getElementById('parent-bachelor');
+    const subHS = document.getElementById('sub-highschool');
+    const subBach = document.getElementById('sub-bachelor');
+
+    if (parentHS && subHS && parentBach && subBach && !parentHS.dataset.accordionBound) {
+        parentHS.dataset.accordionBound = 'true';
+        parentBach.dataset.accordionBound = 'true';
+
+        parentHS.onclick = () => {
+            const isHidden = subHS.classList.contains('d-none');
+            if (isHidden) {
+                subHS.classList.remove('d-none');
+                parentHS.querySelector('.accordion-arrow').textContent = '▲';
+                // Close bachelor
+                subBach.classList.add('d-none');
+                parentBach.querySelector('.accordion-arrow').textContent = '▼';
+            } else {
+                subHS.classList.add('d-none');
+                parentHS.querySelector('.accordion-arrow').textContent = '▼';
+            }
+        };
+
+        parentBach.onclick = () => {
+            const isHidden = subBach.classList.contains('d-none');
+            if (isHidden) {
+                subBach.classList.remove('d-none');
+                parentBach.querySelector('.accordion-arrow').textContent = '▲';
+                // Close highschool
+                subHS.classList.add('d-none');
+                parentHS.querySelector('.accordion-arrow').textContent = '▼';
+            } else {
+                subBach.classList.add('d-none');
+                parentBach.querySelector('.accordion-arrow').textContent = '▼';
+            }
+        };
+    }
+
+    // Set default accordion expanded state based on activeQualificationScope
+    if (subHS && subBach && parentHS && parentBach) {
+        if (activeQualificationScope === 'ม.ปลาย') {
+            subHS.classList.remove('d-none');
+            parentHS.querySelector('.accordion-arrow').textContent = '▲';
+            subBach.classList.add('d-none');
+            parentBach.querySelector('.accordion-arrow').textContent = '▼';
+        } else {
+            subBach.classList.remove('d-none');
+            parentBach.querySelector('.accordion-arrow').textContent = '▲';
+            subHS.classList.add('d-none');
+            parentHS.querySelector('.accordion-arrow').textContent = '▼';
+        }
+    }
 
     // Bind tab clicks
     document.querySelectorAll('.admin-menu-item').forEach(btn => {
         const tabName = btn.getAttribute('data-tab');
         if (!tabName) return;
-        btn.onclick = () => {
-            document.querySelectorAll('.admin-menu-item').forEach(b => b.classList.remove('active'));
+        
+        btn.onclick = async () => {
+            // Remove active classes and dynamic glow styling from all
+            document.querySelectorAll('.admin-menu-item').forEach(b => {
+                b.classList.remove('active');
+                b.style.background = '';
+                b.style.color = '';
+                b.style.border = '';
+                b.style.boxShadow = '';
+            });
             btn.classList.add('active');
+            
+            // Set dynamic neon glow active styles
+            const qual = btn.getAttribute('data-qual');
+            if (qual === 'ม.ปลาย') {
+                btn.style.background = 'rgba(255, 215, 0, 0.15)';
+                btn.style.color = '#ffd700';
+                btn.style.border = '1px solid rgba(255, 215, 0, 0.4)';
+                btn.style.boxShadow = '0 0 8px rgba(255, 215, 0, 0.3)';
+            } else if (qual === 'ป.ตรี') {
+                btn.style.background = 'rgba(0, 255, 102, 0.15)';
+                btn.style.color = '#00ff66';
+                btn.style.border = '1px solid rgba(0, 255, 102, 0.4)';
+                btn.style.boxShadow = '0 0 8px rgba(0, 255, 102, 0.3)';
+            } else {
+                btn.style.background = 'rgba(0, 210, 255, 0.15)';
+                btn.style.color = '#00d2ff';
+                btn.style.border = '1px solid rgba(0, 210, 255, 0.4)';
+                btn.style.boxShadow = '0 0 8px rgba(0, 210, 255, 0.3)';
+            }
+            
+            if (qual) {
+                activeQualificationScope = qual;
+                await syncFromBackend(activeQualificationScope);
+                
+                // Refresh list contents scoped to the new qualification
+                renderAdminSubjectConfigs();
+                renderAdminQuestionsList();
+                renderAdminMembersList();
+                renderDatabaseCapacity();
+                renderLeaderboard();
+            }
+            
             switchAdminTab(tabName);
         };
     });
@@ -1618,11 +1742,11 @@ function renderAdminSubjectConfigs() {
         if (!valid) return;
 
         // Save new config
-        saveConfig(newConfig);
+        saveConfig(newConfig, activeQualificationScope);
 
         // Save updated questions if renamed
         if (questionsUpdated) {
-            saveQuestions(questions);
+            saveQuestions(questions, activeQualificationScope);
             showToast('ปรับปรุงรายชื่อวิชาในคลังข้อสอบเรียบร้อยแล้ว!');
         }
 
@@ -1769,7 +1893,7 @@ function renderAdminQuestionsList() {
                     tr.querySelector('.delete-question-btn').onclick = (e) => {
                         e.stopPropagation();
                         if (confirm(`คุณต้องการลบข้อสอบ: "${q.question.substr(0, 40)}..." ใช่หรือไม่?`)) {
-                            deleteQuestionItem(q.id);
+                            deleteQuestionItem(q.id, activeQualificationScope);
                             showToast('ลบข้อสอบออกจากคลังสำเร็จแล้ว');
                             renderAdminQuestionsList();
                             updateFilterSelect();
@@ -1853,8 +1977,8 @@ function deleteQuestionsFolder(subject, folderName) {
     });
 
     const deletedCount = questions.length - updated.length;
-    saveQuestions(updated);
-    updateSubjectConfigs();
+    saveQuestions(updated, activeQualificationScope);
+    updateSubjectConfigs(activeQualificationScope);
     showToast(`ลบโฟลเดอร์ข้อสอบและข้อสอบทั้งหมด ${deletedCount} ข้อ สำเร็จแล้ว`);
     renderAdminQuestionsList();
 }
@@ -1928,7 +2052,8 @@ function openQuestionModal(questionData = null, isPreview = false, previewIndex 
                 D: document.getElementById('modal-q-opt-d').value.trim()
             },
             correct: document.getElementById('modal-q-correct').value,
-            explanation: document.getElementById('modal-q-explanation').value.trim()
+            explanation: document.getElementById('modal-q-explanation').value.trim(),
+            qualification: activeQualificationScope
         };
 
         if (isPreview) {
@@ -1945,7 +2070,7 @@ function openQuestionModal(questionData = null, isPreview = false, previewIndex 
                 }
             }
 
-            saveQuestionItem(newQuestion);
+            saveQuestionItem(newQuestion, activeQualificationScope);
             showToast(qId ? 'แก้ไขข้อมูลข้อสอบแล้ว' : 'บันทึกคำถามข้อใหม่สำเร็จ!');
             
             modal.style.display = 'none';
@@ -1991,7 +2116,7 @@ function renderAdminMembersList() {
         } else {
             deleteBtn.onclick = () => {
                 if (confirm(`คุณต้องการลบผู้สอบ: ${user.name} (${user.gmail}) ใช่หรือไม่?`)) {
-                    deleteMember(user.gmail);
+                    deleteMember(user.gmail, activeQualificationScope);
                     showToast('ลบบัญชีสมาชิกเรียบร้อยแล้ว');
                     renderAdminMembersList();
                 }
@@ -2045,10 +2170,10 @@ function openMemberModal(userData = null) {
 
         try {
             if (mode === 'add') {
-                addMember(gmail, password, name, role);
+                addMember(gmail, password, name, role, activeQualificationScope);
                 showToast('สร้างสมาชิกใหม่เข้าฐานข้อมูลแล้ว!');
             } else {
-                updateMember(gmail, { name, password, role });
+                updateMember(gmail, { name, password, role }, activeQualificationScope);
                 showToast('อัปเดตข้อมูลสมาชิกสำเร็จ');
             }
             modal.style.display = 'none';
@@ -2471,7 +2596,7 @@ function bindImportExportElements() {
         importBtn.textContent = '🔄 กำลังดึงข้อมูลและประมวลผล...';
 
         try {
-            const count = await syncFromGoogleSheets(url, mode, subjectFilter);
+            const count = await syncFromGoogleSheets(url, mode, subjectFilter, activeQualificationScope);
             if (subjectFilter === 'all') {
                 showToast(`นำเข้าข้อสอบจาก Google Sheets สำเร็จ! รวมนำเข้าได้ ${count} ข้อ`);
             } else {
@@ -2529,6 +2654,7 @@ function bindImportExportElements() {
                     if (!newQ.sourceFile) {
                         newQ.sourceFile = file.name;
                     }
+                    newQ.qualification = activeQualificationScope;
                 });
 
                 // Verify fields in first element
@@ -2603,8 +2729,8 @@ function bindImportExportElements() {
                         }
                     }
 
-                    saveQuestions(finalQuestions);
-                    updateSubjectConfigs();
+                    saveQuestions(finalQuestions, activeQualificationScope);
+                    updateSubjectConfigs(activeQualificationScope);
                     
                     const addedCount = finalQuestions.length - current.length;
                     if (mode === 'overwrite') {
@@ -2845,16 +2971,17 @@ function bindImportExportElements() {
                     }
                 }
                 
-                // Add unique IDs to new questions if missing
+                // Add unique IDs to new questions if missing and assign qualification
                 finalQuestions.forEach((q, idx) => {
                     if (!q.id) {
                         q.id = 'q_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
                     }
+                    q.qualification = activeQualificationScope;
                 });
                 
                 // Save questions
-                saveQuestions(finalQuestions);
-                updateSubjectConfigs();
+                saveQuestions(finalQuestions, activeQualificationScope);
+                updateSubjectConfigs(activeQualificationScope);
                 
                 if (subjectFilter === 'all') {
                     showToast(`นำเข้าข้อสอบจากไฟล์สำเร็จ! รวมนำเข้าได้ ${tempFileQuestions.length} ข้อ`);
@@ -2916,6 +3043,11 @@ function renderDatabaseCapacity() {
 }
 
 function renderLeaderboard() {
+    const titleEl = document.getElementById('leaderboard-title');
+    if (titleEl) {
+        titleEl.textContent = `🏆 3 อันดับแรกทำคะแนนสูงสุด (${activeQualificationScope})`;
+    }
+
     const listContainer = document.getElementById('leaderboard-list');
     if (!listContainer) return;
     listContainer.innerHTML = '';
