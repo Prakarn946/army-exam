@@ -431,45 +431,72 @@ const DEFAULT_CONFIG = {
     'subjectOrder': ['คณิตศาสตร์', 'ภาษาอังกฤษ', 'ความรู้ทั่วไป']
 };
 
-// Local In-Memory Cache for server sync
+export let currentActiveQualification = 'ม.ปลาย';
+
+export function setActiveQualification(qualification) {
+    if (qualification) {
+        currentActiveQualification = qualification;
+    }
+}
+
+export function getActiveQualification() {
+    return currentActiveQualification;
+}
+
+function getScopedKey(baseKey, qualification) {
+    const q = qualification || currentActiveQualification;
+    return `${baseKey}_${q}`;
+}
+
+// Local In-Memory Cache for server sync partitioned by qualification
 let localCache = {
-    questions: [],
-    users: [],
+    questions: {},
+    users: {},
     config: {},
-    attempts: [],
+    attempts: {},
     dbSizeBytes: 0
 };
 
 // Sync from backend
-export async function syncFromBackend(qualification) {
+export async function syncFromBackend(qualification, skipQuestions = false) {
+    const q = qualification || currentActiveQualification;
+    setActiveQualification(q);
+    
     try {
-        const url = qualification ? `/api/db?qualification=${encodeURIComponent(qualification)}` : '/api/db';
+        let url = `/api/db?qualification=${encodeURIComponent(q)}`;
+        if (skipQuestions) {
+            url += '&skip_questions=true';
+        }
         const response = await fetch(url);
         if (response.ok) {
             const data = await response.json();
-            localCache.questions = data.questions || [];
-            localCache.users = data.users || [];
-            localCache.config = data.config || {};
-            localCache.attempts = data.attempts || [];
+            if (!skipQuestions) {
+                localCache.questions[q] = data.questions || [];
+                localStorage.setItem(getScopedKey(STORE_KEYS.QUESTIONS, q), JSON.stringify(localCache.questions[q]));
+            }
+            localCache.users[q] = data.users || [];
+            localCache.config[q] = data.config || {};
+            localCache.attempts[q] = data.attempts || [];
             localCache.dbSizeBytes = data.db_size_bytes || 0;
             
             // Backup to localStorage
-            localStorage.setItem(STORE_KEYS.QUESTIONS, JSON.stringify(localCache.questions));
-            localStorage.setItem(STORE_KEYS.USERS, JSON.stringify(localCache.users));
-            localStorage.setItem(STORE_KEYS.CONFIG, JSON.stringify(localCache.config));
-            localStorage.setItem(STORE_KEYS.ATTEMPTS, JSON.stringify(localCache.attempts));
+            localStorage.setItem(getScopedKey(STORE_KEYS.USERS, q), JSON.stringify(localCache.users[q]));
+            localStorage.setItem(getScopedKey(STORE_KEYS.CONFIG, q), JSON.stringify(localCache.config[q]));
+            localStorage.setItem(getScopedKey(STORE_KEYS.ATTEMPTS, q), JSON.stringify(localCache.attempts[q]));
             localStorage.setItem('army_exam_db_size_bytes', localCache.dbSizeBytes.toString());
             return true;
         }
     } catch (e) {
-        console.error("Failed to sync from backend, using localStorage fallback:", e);
+        console.error(`Failed to sync from backend for ${q}, using localStorage fallback:`, e);
     }
     
     // Fallback if offline
-    localCache.questions = JSON.parse(localStorage.getItem(STORE_KEYS.QUESTIONS)) || [];
-    localCache.users = JSON.parse(localStorage.getItem(STORE_KEYS.USERS)) || [];
-    localCache.config = JSON.parse(localStorage.getItem(STORE_KEYS.CONFIG)) || DEFAULT_CONFIG;
-    localCache.attempts = JSON.parse(localStorage.getItem(STORE_KEYS.ATTEMPTS)) || [];
+    if (!skipQuestions) {
+        localCache.questions[q] = JSON.parse(localStorage.getItem(getScopedKey(STORE_KEYS.QUESTIONS, q))) || [];
+    }
+    localCache.users[q] = JSON.parse(localStorage.getItem(getScopedKey(STORE_KEYS.USERS, q))) || [];
+    localCache.config[q] = JSON.parse(localStorage.getItem(getScopedKey(STORE_KEYS.CONFIG, q))) || DEFAULT_CONFIG;
+    localCache.attempts[q] = JSON.parse(localStorage.getItem(getScopedKey(STORE_KEYS.ATTEMPTS, q))) || [];
     localCache.dbSizeBytes = parseInt(localStorage.getItem('army_exam_db_size_bytes') || '0');
     return false;
 }
@@ -480,56 +507,65 @@ export function getDbSizeBytes() {
 
 // Initialize Store
 export async function initStore(qualification) {
+    const q = qualification || currentActiveQualification;
+    setActiveQualification(q);
+    
     // 1. Sync from server
-    const synced = await syncFromBackend(qualification);
+    const synced = await syncFromBackend(q);
     
     // 2. Only seed defaults if:
     //    - We are online AND the server returned completely empty questions AND empty users (first time fresh server install)
     //    - OR we are offline AND localStorage is completely empty (first time offline user)
-    const isFreshServer = synced && localCache.questions.length === 0 && localCache.users.length === 0;
-    const isFreshOffline = !synced && (JSON.parse(localStorage.getItem(STORE_KEYS.QUESTIONS)) || []).length === 0;
+    const isFreshServer = synced && (localCache.questions[q] || []).length === 0 && (localCache.users[q] || []).length === 0;
+    const isFreshOffline = !synced && (JSON.parse(localStorage.getItem(getScopedKey(STORE_KEYS.QUESTIONS, q))) || []).length === 0;
     
     if (isFreshServer || isFreshOffline) {
-        localCache.questions = DEFAULT_QUESTIONS;
-        localCache.users = DEFAULT_USERS;
-        localCache.config = DEFAULT_CONFIG;
-        localCache.attempts = [];
+        localCache.questions[q] = DEFAULT_QUESTIONS;
+        localCache.users[q] = DEFAULT_USERS;
+        localCache.config[q] = DEFAULT_CONFIG;
+        localCache.attempts[q] = [];
         
         // Save to local
-        localStorage.setItem(STORE_KEYS.QUESTIONS, JSON.stringify(DEFAULT_QUESTIONS));
-        localStorage.setItem(STORE_KEYS.USERS, JSON.stringify(DEFAULT_USERS));
-        localStorage.setItem(STORE_KEYS.CONFIG, JSON.stringify(DEFAULT_CONFIG));
-        localStorage.setItem(STORE_KEYS.ATTEMPTS, JSON.stringify([]));
+        localStorage.setItem(getScopedKey(STORE_KEYS.QUESTIONS, q), JSON.stringify(DEFAULT_QUESTIONS));
+        localStorage.setItem(getScopedKey(STORE_KEYS.USERS, q), JSON.stringify(DEFAULT_USERS));
+        localStorage.setItem(getScopedKey(STORE_KEYS.CONFIG, q), JSON.stringify(DEFAULT_CONFIG));
+        localStorage.setItem(getScopedKey(STORE_KEYS.ATTEMPTS, q), JSON.stringify([]));
         
         // Sync to server only if online (isFreshServer)
         if (synced) {
-            saveQuestions(DEFAULT_QUESTIONS);
-            saveUsers(DEFAULT_USERS);
-            saveConfig(DEFAULT_CONFIG);
-            saveAttempts([]);
+            saveQuestions(DEFAULT_QUESTIONS, q);
+            saveUsers(DEFAULT_USERS, q);
+            saveConfig(DEFAULT_CONFIG, q);
+            saveAttempts([], q);
         }
     }
 }
 
 // Questions Functions
-export function getQuestions() {
-    return localCache.questions.length > 0 ? localCache.questions : (JSON.parse(localStorage.getItem(STORE_KEYS.QUESTIONS)) || []);
+export function getQuestions(qualification) {
+    const q = qualification || currentActiveQualification;
+    if (!localCache.questions[q]) {
+        localCache.questions[q] = JSON.parse(localStorage.getItem(getScopedKey(STORE_KEYS.QUESTIONS, q))) || [];
+    }
+    return localCache.questions[q];
 }
 
 export function saveQuestions(questions, qualification) {
-    localCache.questions = questions;
-    localStorage.setItem(STORE_KEYS.QUESTIONS, JSON.stringify(questions));
-    const url = qualification ? `/api/save_questions?qualification=${encodeURIComponent(qualification)}` : '/api/save_questions';
+    const q = qualification || currentActiveQualification;
+    localCache.questions[q] = questions;
+    localStorage.setItem(getScopedKey(STORE_KEYS.QUESTIONS, q), JSON.stringify(questions));
+    const url = q ? `/api/save_questions?qualification=${encodeURIComponent(q)}` : '/api/save_questions';
     fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(questions)
-    }).catch(err => console.error("Error syncing questions to server:", err));
+    }).catch(err => console.error(`Error syncing questions to server for ${q}:`, err));
 }
 
-export function getSubjects() {
-    const config = getConfig();
-    const questions = getQuestions();
+export function getSubjects(qualification) {
+    const q = qualification || currentActiveQualification;
+    const config = getConfig(q);
+    const questions = getQuestions(q);
     const subjects = new Set();
     
     // 1. Add configured subjects in saved order
@@ -549,65 +585,81 @@ export function getSubjects() {
     });
 
     // 3. Add subjects from questions
-    questions.forEach(q => {
-        if (q.subject) subjects.add(q.subject);
+    questions.forEach(item => {
+        if (item.subject) subjects.add(item.subject);
     });
     
     return Array.from(subjects);
 }
 
 // User Functions
-export function getUsers() {
-    return localCache.users.length > 0 ? localCache.users : (JSON.parse(localStorage.getItem(STORE_KEYS.USERS)) || []);
+export function getUsers(qualification) {
+    const q = qualification || currentActiveQualification;
+    if (!localCache.users[q]) {
+        localCache.users[q] = JSON.parse(localStorage.getItem(getScopedKey(STORE_KEYS.USERS, q))) || [];
+    }
+    return localCache.users[q];
 }
 
 export function saveUsers(users, qualification) {
-    localCache.users = users;
-    localStorage.setItem(STORE_KEYS.USERS, JSON.stringify(users));
-    const url = qualification ? `/api/save_users?qualification=${encodeURIComponent(qualification)}` : '/api/save_users';
+    const q = qualification || currentActiveQualification;
+    localCache.users[q] = users;
+    localStorage.setItem(getScopedKey(STORE_KEYS.USERS, q), JSON.stringify(users));
+    const url = q ? `/api/save_users?qualification=${encodeURIComponent(q)}` : '/api/save_users';
     fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(users)
-    }).catch(err => console.error("Error syncing users to server:", err));
+    }).catch(err => console.error(`Error syncing users to server for ${q}:`, err));
 }
 
 // Config Functions
-export function getConfig() {
-    return (localCache.config && Object.keys(localCache.config).length > 0) ? localCache.config : (JSON.parse(localStorage.getItem(STORE_KEYS.CONFIG)) || DEFAULT_CONFIG);
+export function getConfig(qualification) {
+    const q = qualification || currentActiveQualification;
+    if (!localCache.config[q] || Object.keys(localCache.config[q]).length === 0) {
+        localCache.config[q] = JSON.parse(localStorage.getItem(getScopedKey(STORE_KEYS.CONFIG, q))) || DEFAULT_CONFIG;
+    }
+    return localCache.config[q];
 }
 
 export function saveConfig(config, qualification) {
-    localCache.config = config;
-    localStorage.setItem(STORE_KEYS.CONFIG, JSON.stringify(config));
-    const url = qualification ? `/api/save_config?qualification=${encodeURIComponent(qualification)}` : '/api/save_config';
+    const q = qualification || currentActiveQualification;
+    localCache.config[q] = config;
+    localStorage.setItem(getScopedKey(STORE_KEYS.CONFIG, q), JSON.stringify(config));
+    const url = q ? `/api/save_config?qualification=${encodeURIComponent(q)}` : '/api/save_config';
     fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config)
-    }).catch(err => console.error("Error syncing config to server:", err));
+    }).catch(err => console.error(`Error syncing config to server for ${q}:`, err));
 }
 
 // Exam Attempts Functions
-export function getAttempts() {
-    return localCache.attempts.length > 0 ? localCache.attempts : (JSON.parse(localStorage.getItem(STORE_KEYS.ATTEMPTS)) || []);
+export function getAttempts(qualification) {
+    const q = qualification || currentActiveQualification;
+    if (!localCache.attempts[q]) {
+        localCache.attempts[q] = JSON.parse(localStorage.getItem(getScopedKey(STORE_KEYS.ATTEMPTS, q))) || [];
+    }
+    return localCache.attempts[q];
 }
 
 export function saveAttempts(attempts, qualification) {
-    localCache.attempts = attempts;
-    localStorage.setItem(STORE_KEYS.ATTEMPTS, JSON.stringify(attempts));
-    const url = qualification ? `/api/save_attempts?qualification=${encodeURIComponent(qualification)}` : '/api/save_attempts';
+    const q = qualification || currentActiveQualification;
+    localCache.attempts[q] = attempts;
+    localStorage.setItem(getScopedKey(STORE_KEYS.ATTEMPTS, q), JSON.stringify(attempts));
+    const url = q ? `/api/save_attempts?qualification=${encodeURIComponent(q)}` : '/api/save_attempts';
     fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(attempts)
-    }).catch(err => console.error("Error syncing attempts to server:", err));
+    }).catch(err => console.error(`Error syncing attempts to server for ${q}:`, err));
 }
 
 export function addAttempt(attempt) {
-    const attempts = getAttempts();
+    const q = attempt.qualification || currentActiveQualification;
+    const attempts = getAttempts(q);
     attempts.unshift(attempt); // newest first
-    saveAttempts(attempts, attempt.qualification);
+    saveAttempts(attempts, q);
     
     // Send single attempt to server to prevent overwriting concurrency issues
     fetch('/api/add_attempt', {
@@ -618,19 +670,21 @@ export function addAttempt(attempt) {
 }
 
 // Reset Database to Seed values
-export function resetDatabase() {
-    localCache.questions = DEFAULT_QUESTIONS;
-    localCache.users = DEFAULT_USERS;
-    localCache.config = DEFAULT_CONFIG;
-    localCache.attempts = [];
+export function resetDatabase(qualification) {
+    const q = qualification || currentActiveQualification;
+    localCache.questions[q] = DEFAULT_QUESTIONS;
+    localCache.users[q] = DEFAULT_USERS;
+    localCache.config[q] = DEFAULT_CONFIG;
+    localCache.attempts[q] = [];
     
-    localStorage.setItem(STORE_KEYS.QUESTIONS, JSON.stringify(DEFAULT_QUESTIONS));
-    localStorage.setItem(STORE_KEYS.USERS, JSON.stringify(DEFAULT_USERS));
-    localStorage.setItem(STORE_KEYS.CONFIG, JSON.stringify(DEFAULT_CONFIG));
-    localStorage.setItem(STORE_KEYS.ATTEMPTS, JSON.stringify([]));
+    localStorage.setItem(getScopedKey(STORE_KEYS.QUESTIONS, q), JSON.stringify(DEFAULT_QUESTIONS));
+    localStorage.setItem(getScopedKey(STORE_KEYS.USERS, q), JSON.stringify(DEFAULT_USERS));
+    localStorage.setItem(getScopedKey(STORE_KEYS.CONFIG, q), JSON.stringify(DEFAULT_CONFIG));
+    localStorage.setItem(getScopedKey(STORE_KEYS.ATTEMPTS, q), JSON.stringify([]));
     
-    saveQuestions(DEFAULT_QUESTIONS);
-    saveUsers(DEFAULT_USERS);
-    saveConfig(DEFAULT_CONFIG);
-    saveAttempts([]);
+    saveQuestions(DEFAULT_QUESTIONS, q);
+    saveUsers(DEFAULT_USERS, q);
+    saveConfig(DEFAULT_CONFIG, q);
+    saveAttempts([], q);
 }
+

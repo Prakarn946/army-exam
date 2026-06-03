@@ -1,4 +1,4 @@
-import { initStore, getQuestions, saveQuestions, getAttempts, getConfig, saveConfig, resetDatabase, getSubjects, getUsers, saveUsers, syncFromBackend, saveAttempts, getDbSizeBytes } from './store.js?v=5';
+import { initStore, getQuestions, saveQuestions, getAttempts, getConfig, saveConfig, resetDatabase, getSubjects, getUsers, saveUsers, syncFromBackend, saveAttempts, getDbSizeBytes, setActiveQualification } from './store.js?v=5';
 import { registerUser, loginUser, logoutUser, getCurrentUser, isAdmin, isLoggedIn } from './auth.js?v=5';
 import { startNewExam, getActiveSession, answerQuestion, toggleMarkForReview, submitExam, clearActiveSession, saveActiveSession } from './exam.js?v=5';
 import { saveQuestionItem, deleteQuestionItem, saveSubjectConfig, saveExamDuration, addMember, updateMember, deleteMember, syncFromGoogleSheets, updateSubjectConfigs } from './admin.js?v=5';
@@ -107,12 +107,18 @@ function showView(viewId) {
 // Periodic background sync from server
 async function runPeriodicSync() {
     try {
+        // Skip periodic sync during an active exam to ensure perfect performance
+        if (window.currentActiveView === 'exam-view') {
+            return;
+        }
+        
         const user = getCurrentUser();
         let scope = undefined;
         if (user) {
             scope = user.role === 'admin' ? activeQualificationScope : user.qualification;
         }
-        const synced = await syncFromBackend(scope);
+        // Background sync only needs attempts/users, so we skip downloading questions (very heavy)
+        const synced = await syncFromBackend(scope, true);
         if (synced && user) {
             if (user.role === 'admin') {
                 renderLeaderboard();
@@ -221,8 +227,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // 4.3. Start background periodic sync from server (every 10 seconds)
-    setInterval(runPeriodicSync, 10000);
+    // 4.3. Start background periodic sync from server (every 60 seconds)
+    setInterval(runPeriodicSync, 60000);
 
     // 5. Admin Panel toggles
     const adminToggleBtn = document.getElementById('admin-toggle-btn');
@@ -1507,15 +1513,40 @@ function initAdminDashboard() {
             }
             
             if (qual) {
+                const isNewQual = activeQualificationScope !== qual;
                 activeQualificationScope = qual;
-                await syncFromBackend(activeQualificationScope);
+                setActiveQualification(activeQualificationScope);
                 
-                // Refresh list contents scoped to the new qualification
+                // Render immediately from localCache / localStorage (0ms delay!)
                 renderAdminSubjectConfigs();
                 renderAdminQuestionsList();
                 renderAdminMembersList();
                 renderDatabaseCapacity();
                 renderLeaderboard();
+                
+                if (isNewQual) {
+                    const hasCache = getQuestions(activeQualificationScope).length > 0;
+                    if (!hasCache) {
+                        // If no local data, wait for backend sync
+                        await syncFromBackend(activeQualificationScope);
+                        renderAdminSubjectConfigs();
+                        renderAdminQuestionsList();
+                        renderAdminMembersList();
+                        renderDatabaseCapacity();
+                        renderLeaderboard();
+                    } else {
+                        // Async background update so the UI switch is instantaneous
+                        syncFromBackend(activeQualificationScope).then(synced => {
+                            if (synced) {
+                                renderAdminSubjectConfigs();
+                                renderAdminQuestionsList();
+                                renderAdminMembersList();
+                                renderDatabaseCapacity();
+                                renderLeaderboard();
+                            }
+                        });
+                    }
+                }
             }
             
             switchAdminTab(tabName);
