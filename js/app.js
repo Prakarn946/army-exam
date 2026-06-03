@@ -408,7 +408,10 @@ async function goToDashboard() {
         if (candidateContainer) candidateContainer.classList.remove('d-none');
 
         const dbUserName = document.getElementById('dashboard-user-name');
-        if (dbUserName) dbUserName.textContent = user.name;
+        if (dbUserName) {
+            const qualText = user.qualification ? ` (คุณวุฒิ ${user.qualification})` : '';
+            dbUserName.textContent = `${user.name}${qualText}`;
+        }
 
         // Render Dashboard Avatar (image or letter fallback)
         const dbLetterAvatar = document.getElementById('dashboard-user-avatar-letter');
