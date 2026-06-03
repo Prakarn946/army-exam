@@ -1513,16 +1513,40 @@ function initAdminDashboard() {
             }
             
             if (qual) {
+                const isNewQual = activeQualificationScope !== qual;
                 activeQualificationScope = qual;
                 setActiveQualification(activeQualificationScope);
-                await syncFromBackend(activeQualificationScope);
                 
-                // Refresh list contents scoped to the new qualification
+                // Render immediately from localCache / localStorage (0ms delay!)
                 renderAdminSubjectConfigs();
                 renderAdminQuestionsList();
                 renderAdminMembersList();
                 renderDatabaseCapacity();
                 renderLeaderboard();
+                
+                if (isNewQual) {
+                    const hasCache = getQuestions(activeQualificationScope).length > 0;
+                    if (!hasCache) {
+                        // If no local data, wait for backend sync
+                        await syncFromBackend(activeQualificationScope);
+                        renderAdminSubjectConfigs();
+                        renderAdminQuestionsList();
+                        renderAdminMembersList();
+                        renderDatabaseCapacity();
+                        renderLeaderboard();
+                    } else {
+                        // Async background update so the UI switch is instantaneous
+                        syncFromBackend(activeQualificationScope).then(synced => {
+                            if (synced) {
+                                renderAdminSubjectConfigs();
+                                renderAdminQuestionsList();
+                                renderAdminMembersList();
+                                renderDatabaseCapacity();
+                                renderLeaderboard();
+                            }
+                        });
+                    }
+                }
             }
             
             switchAdminTab(tabName);
