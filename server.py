@@ -53,18 +53,22 @@ async def add_no_cache_headers(request: Request, call_next):
 active_sessions = {}
 
 @app.get("/api/db")
-def get_db():
+def get_db(qualification: str = None, skip_questions: bool = False):
     conn = get_db_connection()
     try:
         cur = conn.cursor()
         
         # Load config
-        cur.execute("SELECT data FROM config WHERE id = 1;")
+        config_id = 2 if qualification == 'ป.ตรี' else 1
+        cur.execute("SELECT data FROM config WHERE id = %s;", (config_id,))
         row = cur.fetchone()
         config = row[0] if row else {}
         
         # Load users
-        cur.execute("SELECT gmail, password, name, role, profile_image FROM users;")
+        if qualification and qualification != 'ผู้ดูแล':
+            cur.execute("SELECT gmail, password, name, role, profile_image, qualification FROM users WHERE qualification = %s OR role = 'admin';", (qualification,))
+        else:
+            cur.execute("SELECT gmail, password, name, role, profile_image, qualification FROM users;")
         users = []
         for r in cur.fetchall():
             users.append({
@@ -72,24 +76,33 @@ def get_db():
                 "password": r[1],
                 "name": r[2],
                 "role": r[3],
-                "profileImage": r[4]
+                "profileImage": r[4],
+                "qualification": r[5]
             })
             
         # Load questions
-        cur.execute("SELECT id, subject, question, options, correct, explanation FROM questions;")
         questions = []
-        for r in cur.fetchall():
-            questions.append({
-                "id": r[0],
-                "subject": r[1],
-                "question": r[2],
-                "options": r[3],
-                "correct": r[4],
-                "explanation": r[5]
-            })
+        if not skip_questions:
+            if qualification:
+                cur.execute("SELECT id, subject, question, options, correct, explanation, qualification FROM questions WHERE qualification = %s;", (qualification,))
+            else:
+                cur.execute("SELECT id, subject, question, options, correct, explanation, qualification FROM questions;")
+            for r in cur.fetchall():
+                questions.append({
+                    "id": r[0],
+                    "subject": r[1],
+                    "question": r[2],
+                    "options": r[3],
+                    "correct": r[4],
+                    "explanation": r[5],
+                    "qualification": r[6]
+                })
             
         # Load attempts
-        cur.execute("SELECT id, user_gmail, user_name, timestamp, total_questions, total_score, percentage, subject_stats, question_results FROM attempts ORDER BY timestamp DESC;")
+        if qualification:
+            cur.execute("SELECT id, user_gmail, user_name, timestamp, total_questions, total_score, percentage, subject_stats, question_results, qualification FROM attempts WHERE qualification = %s ORDER BY timestamp DESC;", (qualification,))
+        else:
+            cur.execute("SELECT id, user_gmail, user_name, timestamp, total_questions, total_score, percentage, subject_stats, question_results, qualification FROM attempts ORDER BY timestamp DESC;")
         attempts = []
         for r in cur.fetchall():
             attempts.append({
@@ -101,7 +114,8 @@ def get_db():
                 "totalScore": r[5],
                 "percentage": int(r[6]) if r[6] is not None else 0,
                 "subjectStats": r[7],
-                "questionResults": r[8]
+                "questionResults": r[8],
+                "qualification": r[9]
             })
             
         # Load database size
@@ -110,7 +124,7 @@ def get_db():
             db_size_bytes = cur.fetchone()[0]
         except Exception:
             db_size_bytes = 0
-
+ 
         return {
             "questions": questions,
             "users": users,
@@ -123,7 +137,7 @@ def get_db():
         return {"questions": [], "users": [], "config": {}, "attempts": [], "db_size_bytes": 0}
     finally:
         release_db_connection(conn)
-
+ 
 @app.get("/api/realtime_status")
 def get_realtime_status():
     now = time.time()
@@ -137,6 +151,7 @@ def get_realtime_status():
             "gmail": gmail,
             "name": s["name"],
             "role": "Admin" if s["role"] == "admin" else "Candidate",
+            "qualification": s.get("qualification", ""),
             "status": s["status"],
             "loginTime": time.strftime("%H:%M:%S", time.localtime(s["last_seen"]))
         } for gmail, s in active_sessions.items()
@@ -161,6 +176,7 @@ async def heartbeat(request: Request):
     gmail = payload.get("gmail", "").lower().strip()
     name = payload.get("name", "")
     role = payload.get("role", "")
+    qualification = payload.get("qualification", "")
     status = payload.get("status", "")
     session_id = payload.get("sessionId", "")
     
@@ -174,6 +190,7 @@ async def heartbeat(request: Request):
         active_sessions[gmail] = {
             "name": name,
             "role": role,
+            "qualification": qualification,
             "status": status,
             "sessionId": session_id if session_id else active_sessions.get(gmail, {}).get("sessionId"),
             "last_seen": now
@@ -181,7 +198,7 @@ async def heartbeat(request: Request):
     return {"status": "success"}
 
 @app.post("/api/save_questions")
-async def save_questions(request: Request):
+async def save_questions(request: Request, qualification: str = None):
     try:
         payload = await request.json()
     except Exception:
@@ -190,18 +207,22 @@ async def save_questions(request: Request):
     conn = get_db_connection()
     try:
         cur = conn.cursor()
-        cur.execute("DELETE FROM questions;")
+        if qualification:
+            cur.execute("DELETE FROM questions WHERE qualification = %s;", (qualification,))
+        else:
+            cur.execute("DELETE FROM questions;")
         for q in payload:
             cur.execute("""
-            INSERT INTO questions (id, subject, question, options, correct, explanation)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            INSERT INTO questions (id, subject, question, options, correct, explanation, qualification)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (id) DO UPDATE SET
                 subject = EXCLUDED.subject,
                 question = EXCLUDED.question,
                 options = EXCLUDED.options,
                 correct = EXCLUDED.correct,
-                explanation = EXCLUDED.explanation;
-            """, (q["id"], q["subject"], q["question"], Json(q["options"]), q["correct"], q.get("explanation", "")))
+                explanation = EXCLUDED.explanation,
+                qualification = EXCLUDED.qualification;
+            """, (q["id"], q["subject"], q["question"], Json(q["options"]), q["correct"], q.get("explanation", ""), qualification or q.get("qualification", "ม.ปลาย")))
         conn.commit()
         return {"status": "success"}
     except Exception as e:
@@ -212,7 +233,7 @@ async def save_questions(request: Request):
         release_db_connection(conn)
 
 @app.post("/api/save_config")
-async def save_config(request: Request):
+async def save_config(request: Request, qualification: str = None):
     try:
         payload = await request.json()
     except Exception:
@@ -221,11 +242,12 @@ async def save_config(request: Request):
     conn = get_db_connection()
     try:
         cur = conn.cursor()
+        config_id = 2 if qualification == 'ป.ตรี' else 1
         cur.execute("""
         INSERT INTO config (id, data)
-        VALUES (1, %s)
+        VALUES (%s, %s)
         ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data;
-        """, (Json(payload),))
+        """, (config_id, Json(payload)))
         conn.commit()
         return {"status": "success"}
     except Exception as e:
@@ -236,7 +258,7 @@ async def save_config(request: Request):
         release_db_connection(conn)
 
 @app.post("/api/save_users")
-async def save_users(request: Request):
+async def save_users(request: Request, qualification: str = None):
     try:
         payload = await request.json()
     except Exception:
@@ -245,17 +267,21 @@ async def save_users(request: Request):
     conn = get_db_connection()
     try:
         cur = conn.cursor()
-        cur.execute("DELETE FROM users;")
+        if qualification:
+            cur.execute("DELETE FROM users WHERE qualification = %s AND role != 'admin';", (qualification,))
+        else:
+            cur.execute("DELETE FROM users WHERE role != 'admin';")
         for u in payload:
             cur.execute("""
-            INSERT INTO users (gmail, password, name, role, profile_image)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO users (gmail, password, name, role, profile_image, qualification)
+            VALUES (%s, %s, %s, %s, %s, %s)
             ON CONFLICT (gmail) DO UPDATE SET
                 password = EXCLUDED.password,
                 name = EXCLUDED.name,
                 role = EXCLUDED.role,
-                profile_image = EXCLUDED.profile_image;
-            """, (u["gmail"].lower().strip(), u["password"], u["name"], u["role"], u.get("profileImage")))
+                profile_image = EXCLUDED.profile_image,
+                qualification = EXCLUDED.qualification;
+            """, (u["gmail"].lower().strip(), u["password"], u["name"], u["role"], u.get("profileImage"), qualification or u.get("qualification", "ม.ปลาย")))
         conn.commit()
         return {"status": "success"}
     except Exception as e:
@@ -273,6 +299,7 @@ async def register(request: Request):
         raise HTTPException(status_code=400, detail="Invalid JSON")
         
     gmail = payload.get("gmail", "").lower().strip()
+    qualification = payload.get("qualification", "ม.ปลาย")
     conn = get_db_connection()
     try:
         cur = conn.cursor()
@@ -283,9 +310,9 @@ async def register(request: Request):
             return JSONResponse(status_code=400, content={"error": "Gmail นี้ถูกใช้งานในระบบแล้ว"})
             
         cur.execute("""
-        INSERT INTO users (gmail, password, name, role, profile_image)
-        VALUES (%s, %s, %s, %s, %s);
-        """, (gmail, payload.get("password"), payload.get("name"), payload.get("role"), payload.get("profileImage")))
+        INSERT INTO users (gmail, password, name, role, profile_image, qualification)
+        VALUES (%s, %s, %s, %s, %s, %s);
+        """, (gmail, payload.get("password"), payload.get("name"), payload.get("role"), payload.get("profileImage"), qualification))
         conn.commit()
         return {"status": "success", "user": payload}
     except Exception as e:
@@ -330,8 +357,8 @@ async def add_attempt(request: Request):
     try:
         cur = conn.cursor()
         cur.execute("""
-        INSERT INTO attempts (id, user_gmail, user_name, timestamp, total_questions, total_score, percentage, subject_stats, question_results)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO attempts (id, user_gmail, user_name, timestamp, total_questions, total_score, percentage, subject_stats, question_results, qualification)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (id) DO NOTHING;
         """, (
             payload["id"], 
@@ -342,7 +369,8 @@ async def add_attempt(request: Request):
             payload["totalScore"], 
             payload["percentage"], 
             Json(payload["subjectStats"]), 
-            Json(payload["questionResults"])
+            Json(payload["questionResults"]),
+            payload.get("qualification", "ม.ปลาย")
         ))
         conn.commit()
         return {"status": "success"}
@@ -354,7 +382,7 @@ async def add_attempt(request: Request):
         release_db_connection(conn)
 
 @app.post("/api/save_attempts")
-async def save_attempts(request: Request):
+async def save_attempts(request: Request, qualification: str = None):
     try:
         payload = await request.json()
     except Exception:
@@ -363,11 +391,14 @@ async def save_attempts(request: Request):
     conn = get_db_connection()
     try:
         cur = conn.cursor()
-        cur.execute("DELETE FROM attempts;")
+        if qualification:
+            cur.execute("DELETE FROM attempts WHERE qualification = %s;", (qualification,))
+        else:
+            cur.execute("DELETE FROM attempts;")
         for att in payload:
             cur.execute("""
-            INSERT INTO attempts (id, user_gmail, user_name, timestamp, total_questions, total_score, percentage, subject_stats, question_results)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO attempts (id, user_gmail, user_name, timestamp, total_questions, total_score, percentage, subject_stats, question_results, qualification)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (id) DO NOTHING;
             """, (
                 att["id"], 
@@ -378,7 +409,8 @@ async def save_attempts(request: Request):
                 att["totalScore"], 
                 att["percentage"], 
                 Json(att["subjectStats"]), 
-                Json(att["questionResults"])
+                Json(att["questionResults"]),
+                qualification or att.get("qualification", "ม.ปลาย")
             ))
         conn.commit()
         return {"status": "success"}
@@ -403,7 +435,7 @@ async def login(request: Request):
     conn = get_db_connection()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT gmail, password, name, role, profile_image FROM users WHERE LOWER(gmail) = %s;", (gmail,))
+        cur.execute("SELECT gmail, password, name, role, profile_image, qualification FROM users WHERE LOWER(gmail) = %s;", (gmail,))
         row = cur.fetchone()
         if not row or row[1] != password:
             return JSONResponse(status_code=400, content={"error": "Gmail หรือรหัสผ่านไม่ถูกต้อง"})
@@ -420,6 +452,7 @@ async def login(request: Request):
         active_sessions[gmail] = {
             "name": row[2],
             "role": row[3],
+            "qualification": row[5],
             "status": "กำลังเข้าใช้งาน",
             "sessionId": session_id,
             "last_seen": now
@@ -431,7 +464,8 @@ async def login(request: Request):
                 "gmail": row[0],
                 "name": row[2],
                 "role": row[3],
-                "profileImage": row[4]
+                "profileImage": row[4],
+                "qualification": row[5]
             }
         }
     except Exception as e:
