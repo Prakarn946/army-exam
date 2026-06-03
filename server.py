@@ -138,23 +138,25 @@ def get_db(qualification: str = None, skip_questions: bool = False):
     finally:
         release_db_connection(conn)
  
+def clean_expired_sessions():
+    now = time.time()
+    expired = [key for key, s in active_sessions.items() if now - s["last_seen"] > 20]
+    for key in expired:
+        del active_sessions[key]
+
 @app.get("/api/realtime_status")
 def get_realtime_status():
-    now = time.time()
-    # Clean expired sessions (inactive for more than 20 seconds)
-    expired = [gmail for gmail, s in active_sessions.items() if now - s["last_seen"] > 20]
-    for gmail in expired:
-        del active_sessions[gmail]
+    clean_expired_sessions()
     
     users_list = [
         {
-            "gmail": gmail,
+            "gmail": key.split(':', 1)[0],
             "name": s["name"],
             "role": "Admin" if s["role"] == "admin" else "Candidate",
             "qualification": s.get("qualification", ""),
             "status": s["status"],
             "loginTime": time.strftime("%H:%M:%S", time.localtime(s["last_seen"]))
-        } for gmail, s in active_sessions.items()
+        } for key, s in active_sessions.items()
     ]
     
     online_count = len(users_list)
@@ -180,19 +182,27 @@ async def heartbeat(request: Request):
     status = payload.get("status", "")
     session_id = payload.get("sessionId", "")
     
-    if gmail:
+    if gmail and session_id:
+        clean_expired_sessions()
         now = time.time()
-        # Enforce single session check: if there is an active session with a different sessionId, reject
-        if gmail in active_sessions and now - active_sessions[gmail]["last_seen"] <= 20:
-            if active_sessions[gmail].get("sessionId") and active_sessions[gmail]["sessionId"] != session_id:
-                return {"status": "error", "message": "session_conflict"}
-                
-        active_sessions[gmail] = {
+        
+        # Check active sessions for this email from other sessionIds
+        active_device_sessions = [
+            (key, s) for key, s in active_sessions.items()
+            if key.split(':', 1)[0] == gmail and s.get("sessionId") != session_id
+        ]
+        
+        max_sessions = 5 if role == 'admin' else 1
+        if len(active_device_sessions) >= max_sessions:
+            return {"status": "error", "message": "session_conflict"}
+            
+        session_key = f"{gmail}:{session_id}"
+        active_sessions[session_key] = {
             "name": name,
             "role": role,
             "qualification": qualification,
             "status": status,
-            "sessionId": session_id if session_id else active_sessions.get(gmail, {}).get("sessionId"),
+            "sessionId": session_id,
             "last_seen": now
         }
     return {"status": "success"}
@@ -440,16 +450,30 @@ async def login(request: Request):
         if not row or row[1] != password:
             return JSONResponse(status_code=400, content={"error": "Gmail หรือรหัสผ่านไม่ถูกต้อง"})
             
-        # Enforce 1 session per email: check if user is already online elsewhere
+        clean_expired_sessions()
         now = time.time()
-        if gmail in active_sessions and now - active_sessions[gmail]["last_seen"] <= 20:
-            if active_sessions[gmail].get("sessionId") and active_sessions[gmail]["sessionId"] != session_id:
+        
+        # Check active sessions for this email from other sessionIds
+        active_device_sessions = [
+            (key, s) for key, s in active_sessions.items()
+            if key.split(':', 1)[0] == gmail and s.get("sessionId") != session_id
+        ]
+        
+        user_role = row[3]
+        max_sessions = 5 if user_role == 'admin' else 1
+        if len(active_device_sessions) >= max_sessions:
+            if user_role == 'admin':
+                return JSONResponse(status_code=400, content={
+                    "error": "บัญชีผู้ดูแลระบบเข้าสู่ระบบครบกำหนด 5 เครื่องแล้ว กรุณาออกจากระบบเครื่องอื่นก่อน"
+                })
+            else:
                 return JSONResponse(status_code=400, content={
                     "error": "บัญชีนี้กำลังเข้าสู่ระบบค้างไว้ในเครื่องอื่นอยู่ กรุณารอจนกว่าเครื่องเดิมจะออกจากระบบ หรือปิดเว็ปอย่างน้อย 20 วินาที"
                 })
                 
         # Register/update session
-        active_sessions[gmail] = {
+        session_key = f"{gmail}:{session_id}"
+        active_sessions[session_key] = {
             "name": row[2],
             "role": row[3],
             "qualification": row[5],
@@ -482,8 +506,18 @@ async def logout(request: Request):
         raise HTTPException(status_code=400, detail="Invalid JSON")
         
     gmail = payload.get("gmail", "").lower().strip()
-    if gmail in active_sessions:
-        del active_sessions[gmail]
+    session_id = payload.get("sessionId", "")
+    
+    # Remove sessions for this gmail
+    to_remove = []
+    for key in list(active_sessions.keys()):
+        g, s_id = key.split(':', 1)
+        if g == gmail:
+            if not session_id or s_id == session_id:
+                to_remove.append(key)
+    for key in to_remove:
+        if key in active_sessions:
+            del active_sessions[key]
     return {"status": "success"}
 
 # Mount static files at root "/"
