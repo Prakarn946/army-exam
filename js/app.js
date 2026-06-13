@@ -241,14 +241,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const resetLeaderboardBtn = document.getElementById('reset-leaderboard-btn');
     if (resetLeaderboardBtn) {
         resetLeaderboardBtn.addEventListener('click', () => {
-            if (confirm('⚠️ คุณต้องการลบประวัติคะแนนสอบของผู้ดูแลระบบ (แอดมิน) ทั้งหมดใช่หรือไม่?\n(ประวัติการทำข้อสอบของสมาชิกผู้เข้าสอบคนอื่นๆ จะไม่ถูกลบ)')) {
+            if (confirm(`⚠️ คุณต้องการลบประวัติคะแนนสอบของผู้ดูแลระบบ (แอดมิน) ทั้งหมดสำหรับคุณวุฒิ ${activeQualificationScope} ใช่หรือไม่?\n(ประวัติการทำข้อสอบของสมาชิกผู้เข้าสอบคนอื่นๆ จะไม่ถูกลบ)`)) {
                 const users = getUsers();
                 const adminEmails = new Set(users.filter(u => u.role === 'admin').map(u => u.gmail.toLowerCase()));
                 const attempts = getAttempts(activeQualificationScope);
                 const memberAttempts = attempts.filter(att => !adminEmails.has((att.userGmail || '').toLowerCase().trim()));
                 
                 saveAttempts(memberAttempts, activeQualificationScope);
-                showToast('🔄 ลบประวัติคะแนนสอบจำลองของแอดมินเรียบร้อยแล้ว');
+                showToast(`🔄 ลบประวัติคะแนนสอบจำลองของแอดมินคุณวุฒิ ${activeQualificationScope} เรียบร้อยแล้ว`);
                 renderLeaderboard();
             }
         });
@@ -1616,10 +1616,61 @@ function initAdminDashboard() {
             showToast('💾 บันทึกข้อความหน้าล็อกอินเรียบร้อยแล้ว!');
         };
     }
+
+    // Bind Leaderboard qualification sub-tabs in the sidebar
+    const tabHS = document.getElementById('leaderboard-tab-hs');
+    const tabBach = document.getElementById('leaderboard-tab-bach');
+
+    if (tabHS && tabBach && !tabHS.dataset.bound) {
+        tabHS.dataset.bound = 'true';
+        tabBach.dataset.bound = 'true';
+
+        const updateLeaderboardTabStyles = () => {
+            if (leaderboardActiveQual === 'ม.ปลาย') {
+                tabHS.classList.add('active');
+                tabHS.style.background = 'rgba(255, 215, 0, 0.15)';
+                tabHS.style.color = '#ffd700';
+                tabHS.style.border = '1px solid rgba(255, 215, 0, 0.4)';
+                tabHS.style.boxShadow = '0 0 8px rgba(255, 215, 0, 0.3)';
+                
+                tabBach.classList.remove('active');
+                tabBach.style.background = 'var(--bg-main)';
+                tabBach.style.color = 'var(--text-sub)';
+                tabBach.style.border = '1px solid var(--border-color)';
+                tabBach.style.boxShadow = '';
+            } else {
+                tabBach.classList.add('active');
+                tabBach.style.background = 'rgba(0, 255, 102, 0.15)';
+                tabBach.style.color = '#00ff66';
+                tabBach.style.border = '1px solid rgba(0, 255, 102, 0.4)';
+                tabBach.style.boxShadow = '0 0 8px rgba(0, 255, 102, 0.3)';
+                
+                tabHS.classList.remove('active');
+                tabHS.style.background = 'var(--bg-main)';
+                tabHS.style.color = 'var(--text-sub)';
+                tabHS.style.border = '1px solid var(--border-color)';
+                tabHS.style.boxShadow = '';
+            }
+        };
+
+        updateLeaderboardTabStyles();
+
+        tabHS.onclick = () => {
+            leaderboardActiveQual = 'ม.ปลาย';
+            updateLeaderboardTabStyles();
+            renderLeaderboard();
+        };
+
+        tabBach.onclick = () => {
+            leaderboardActiveQual = 'ป.ตรี';
+            updateLeaderboardTabStyles();
+            renderLeaderboard();
+        };
+    }
 }
 
 function switchAdminTab(tabId) {
-    const tabs = ['admin-config', 'admin-questions', 'admin-members', 'admin-import', 'admin-realtime'];
+    const tabs = ['admin-config', 'admin-questions', 'admin-members', 'admin-import', 'admin-realtime', 'admin-leaderboard'];
     tabs.forEach(id => {
         const el = document.getElementById(`tab-${id}`);
         if (el) {
@@ -1638,7 +1689,8 @@ function switchAdminTab(tabId) {
             'admin-config': 'ตั้งค่าแผนจัดสรรข้อสอบ',
             'admin-questions': 'บริหารคลังข้อสอบ',
             'admin-members': 'จัดการรายชื่อสมาชิก',
-            'admin-import': 'นำเข้าข้อสอบจากระบบภายนอก'
+            'admin-import': 'นำเข้าข้อสอบจากระบบภายนอก',
+            'admin-leaderboard': 'จัดอันดับคะแนนของผู้เข้าสอบทั้งหมด'
         };
         const name = tabNames[tabId] || tabId;
         appendRealtimeActivityLog(`👤 <span style="color: #00d2ff;">แอดมิน</span> สลับหน้าเมนูหลักไปยัง: <strong>${name}</strong>`);
@@ -3134,16 +3186,16 @@ function renderDatabaseCapacity() {
 }
 
 function renderLeaderboard() {
-    const titleEl = document.getElementById('leaderboard-title');
+    const titleEl = document.getElementById('leaderboard-panel-title');
     if (titleEl) {
-        titleEl.textContent = `🏆 3 อันดับแรกทำคะแนนสูงสุด (${activeQualificationScope})`;
+        titleEl.textContent = `🏆 จัดอันดับคะแนนของผู้เข้าสอบทั้งหมด คุณวุฒิ ${activeQualificationScope}`;
     }
 
-    const listContainer = document.getElementById('leaderboard-list');
-    if (!listContainer) return;
-    listContainer.innerHTML = '';
+    const tableBody = document.getElementById('leaderboard-panel-table-body');
+    if (!tableBody) return;
+    tableBody.innerHTML = '';
 
-    const attempts = getAttempts();
+    const attempts = getAttempts(activeQualificationScope);
     
     // Group attempts by userGmail to get highest percentage attempt per user
     const userBest = {};
@@ -3163,60 +3215,43 @@ function renderLeaderboard() {
     });
 
     const sorted = Object.values(userBest).sort((a, b) => b.percentage - a.percentage);
-    const top3 = sorted.slice(0, 3);
 
-    if (top3.length === 0) {
-        listContainer.innerHTML = `
-            <div style="font-size: 11px; color: var(--text-sub); text-align: center; padding: 12px 0; font-weight: 500;">
-                📭 ยังไม่มีประวัติการสอบเข้าในระบบ
-            </div>
+    if (sorted.length === 0) {
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="5" style="text-align: center; color: var(--text-sub); padding: 24px;">
+                    📭 ยังไม่มีประวัติการสอบเข้าในระบบสำหรับคุณวุฒินี้
+                </td>
+            </tr>
         `;
         return;
     }
 
-    top3.forEach((user, idx) => {
-        const item = document.createElement('div');
-        item.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-radius: var(--radius-sm); font-size: 12px; transition: var(--transition); border: 1px solid var(--border-color);';
+    sorted.forEach((user, idx) => {
+        const row = document.createElement('tr');
         
-        let rankBadge = '';
-        let rankStyle = '';
-        let itemBg = 'var(--bg-main)';
-        let borderStyle = '1px solid var(--border-color)';
+        let rankBadge = `${idx + 1}`;
+        let rankStyle = 'font-weight: bold; color: var(--text-sub);';
         
         if (idx === 0) {
             rankBadge = '👑';
-            rankStyle = 'color: #ffd700; font-weight: bold; font-size: 14px;';
-            itemBg = 'rgba(255, 215, 0, 0.08)';
-            borderStyle = '1.5px solid #ffd700';
+            rankStyle = 'font-size: 18px; text-shadow: 0 0 8px rgba(255, 215, 0, 0.6);';
         } else if (idx === 1) {
             rankBadge = '🥈';
-            rankStyle = 'color: #c0c0c0; font-weight: bold; font-size: 14px;';
-            itemBg = 'rgba(192, 192, 192, 0.08)';
-            borderStyle = '1.5px solid #c0c0c0';
+            rankStyle = 'font-size: 18px; text-shadow: 0 0 8px rgba(0, 229, 255, 0.6);';
         } else if (idx === 2) {
             rankBadge = '🥉';
-            rankStyle = 'color: #cd7f32; font-weight: bold; font-size: 14px;';
-            itemBg = 'rgba(205, 127, 50, 0.08)';
-            borderStyle = '1.5px solid #cd7f32';
+            rankStyle = 'font-size: 18px; text-shadow: 0 0 8px rgba(255, 145, 0, 0.6);';
         }
 
-        item.style.background = itemBg;
-        item.style.border = borderStyle;
-
-        item.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 72%;">
-                <span style="${rankStyle}">${rankBadge}</span>
-                <div style="display: flex; flex-direction: column; overflow: hidden;">
-                    <span style="font-weight: 700; color: var(--text-main); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(user.name)}">${escapeHtml(user.name)}</span>
-                    <span style="font-size: 10px; color: var(--text-sub); overflow: hidden; text-overflow: ellipsis;">${escapeHtml(user.gmail)}</span>
-                </div>
-            </div>
-            <div style="text-align: right; flex-shrink: 0;">
-                <span style="font-weight: 800; font-size: 15px; color: ${idx === 0 ? '#ffd700' : idx === 1 ? '#00e5ff' : '#ff9100'}; text-shadow: 0 0 8px ${idx === 0 ? 'rgba(255, 215, 0, 0.7)' : idx === 1 ? 'rgba(0, 229, 255, 0.7)' : 'rgba(255, 145, 0, 0.7)'};">${user.percentage}%</span>
-                <div style="font-size: 9px; color: var(--text-sub); font-weight: 600;">${user.totalScore}/${user.totalQuestions} ข้อ</div>
-            </div>
+        row.innerHTML = `
+            <td style="text-align: center; ${rankStyle}">${rankBadge}</td>
+            <td style="font-weight: 700; color: var(--text-main);">${escapeHtml(user.name)}</td>
+            <td style="color: var(--text-sub); font-family: monospace;">${escapeHtml(user.gmail)}</td>
+            <td style="text-align: center; font-weight: 800; font-size: 15px; color: var(--primary-light);">${user.percentage}%</td>
+            <td style="text-align: center; font-weight: 600; color: var(--text-sub);">${user.totalScore} / ${user.totalQuestions} ข้อ</td>
         `;
-        listContainer.appendChild(item);
+        tableBody.appendChild(row);
     });
 }
 
