@@ -256,8 +256,10 @@ main {
     margin: auto;
     padding: 40px;
     background: var(--bg-card);
-    border: none;
+    border: 1px solid var(--border-color);
+    border-top: 5px solid var(--secondary-color);
     border-radius: var(--radius-lg);
+    box-shadow: 0 12px 32px var(--shadow-color);
     transition: var(--transition);
     position: relative;
     z-index: 1;
@@ -417,8 +419,8 @@ main {
 .stat-val {
     font-size: 36px;
     font-weight: 800;
-    color: #2e7d32; /* Bright vibrant green */
-    text-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    color: #00d2ff; /* Glowing neon light blue */
+    text-shadow: 0 0 10px rgba(0, 210, 255, 0.65), 0 0 20px rgba(0, 210, 255, 0.25);
 }
 
 .stat-label {
@@ -1392,16 +1394,16 @@ tr:hover td {
 }
 
 .timeframe-btn:hover {
-    border-color: #00d2ff;
-    color: #00d2ff;
-    box-shadow: 0 0 8px rgba(0, 210, 255, 0.2);
+    border-color: var(--primary-light);
+    color: var(--primary-light);
+    box-shadow: 0 0 8px rgba(82, 124, 86, 0.2);
 }
 
 .timeframe-btn.active {
-    background: linear-gradient(135deg, #00c6ff, #0072ff);
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
     color: white;
     border-color: transparent;
-    box-shadow: 0 4px 12px rgba(0, 114, 255, 0.35);
+    box-shadow: 0 4px 12px rgba(59, 91, 62, 0.3);
 }
 
 /* Collapsible Folders style details */
@@ -1421,28 +1423,28 @@ tr:hover td {
 /* Pulsing Green Dot animation for live indicators */
 @keyframes greenPulse {
     0% {
-        box-shadow: 0 0 0 0 rgba(0, 255, 102, 0.7);
+        box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7);
     }
     70% {
-        box-shadow: 0 0 0 10px rgba(0, 255, 102, 0);
+        box-shadow: 0 0 0 10px rgba(76, 175, 80, 0);
     }
     100% {
-        box-shadow: 0 0 0 0 rgba(0, 255, 102, 0);
+        box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
     }
 }
 .live-indicator-dot {
     width: 10px;
     height: 10px;
-    background-color: #00ff66;
+    background-color: #4caf50;
     border-radius: 50%;
     display: inline-block;
-    box-shadow: 0 0 8px #00ff66;
+    box-shadow: 0 0 8px #4caf50;
     animation: greenPulse 2s infinite;
 }
 
 /* Admin Copy Link Button styles */
 .admin-copy-link-btn {
-    background: linear-gradient(135deg, #00c6ff, #0072ff) !important;
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-light)) !important;
     color: white !important;
     border: none !important;
     padding: 10px 16px;
@@ -1453,12 +1455,12 @@ tr:hover td {
     display: flex;
     align-items: center;
     gap: 6px;
-    box-shadow: 0 0 10px rgba(0, 198, 255, 0.3);
+    box-shadow: 0 4px 12px rgba(59, 91, 62, 0.25);
     transition: var(--transition);
 }
 
 .admin-copy-link-btn:hover {
-    box-shadow: 0 0 18px rgba(0, 198, 255, 0.6) !important;
+    box-shadow: 0 6px 16px rgba(59, 91, 62, 0.4) !important;
     transform: translateY(-1px) scale(1.02);
 }
 
@@ -1469,41 +1471,7 @@ tr:hover td {
     }
 }
 
-/* Golden glowing rotating border animation for Login card */
-.auth-container::before {
-    content: '';
-    position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: conic-gradient(from 0deg, transparent 70%, rgba(255, 215, 0, 0.1) 85%, #ffd700 100%);
-    z-index: -2;
-    animation: rotate-gold-glow 12s linear infinite;
-    transform-origin: center;
-}
 
-.auth-container::after {
-    content: '';
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    right: 2px;
-    bottom: 2px;
-    background: var(--bg-card);
-    border-radius: calc(var(--radius-lg) - 2px);
-    z-index: -1;
-    transition: background-color 0.3s ease;
-}
-
-@keyframes rotate-gold-glow {
-    0% {
-        transform: rotate(0deg);
-    }
-    100% {
-        transform: rotate(360deg);
-    }
-}
 
 /* Fade in animation for smooth transitions */
 .fade-in {
