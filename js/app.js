@@ -189,7 +189,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 3. Theme Toggle Button
     const themeBtn = document.getElementById('theme-toggle-btn');
-    const savedTheme = localStorage.getItem('theme') || 'light';
+    const savedTheme = localStorage.getItem('theme') || 'dark';
     document.documentElement.setAttribute('data-theme', savedTheme);
     themeBtn.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
     
