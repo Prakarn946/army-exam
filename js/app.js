@@ -712,13 +712,21 @@ function renderAttemptsHistory(userGmail) {
                 hour: '2-digit', minute: '2-digit'
             });
 
+            const isPassed = attempt.percentage >= 70;
+            const scoreBg = isPassed 
+                ? 'linear-gradient(135deg, #2e7d32, #4caf50)' 
+                : 'linear-gradient(135deg, #d32f2f, #ef5350)';
+            const scoreShadow = isPassed 
+                ? '0 0 12px rgba(76, 175, 80, 0.6)' 
+                : '0 0 12px rgba(239, 83, 80, 0.6)';
+
             item.innerHTML = `
                 <div class="history-info">
                     <h4>ทดสอบรอบข้อสอบรวม ${attempt.totalQuestions} ข้อ</h4>
                     <p>📅 สอบเมื่อ: ${dateStr}</p>
                 </div>
                 <div class="flex align-center">
-                    <div class="history-score" style="background: linear-gradient(135deg, var(--primary-color), var(--primary-light)); color: white; padding: 8px 16px; border-radius: var(--radius-sm); text-align: center; min-width: 90px; box-shadow: 0 4px 10px rgba(59,91,62,0.15);">
+                    <div class="history-score" style="background: ${scoreBg}; color: white; padding: 8px 16px; border-radius: var(--radius-sm); text-align: center; min-width: 90px; box-shadow: ${scoreShadow};">
                         <div class="history-score-val" style="color: white; font-size: 16px; font-weight: 700;">${attempt.totalScore}/${attempt.totalQuestions}</div>
                         <div class="history-score-percent" style="color: rgba(255,255,255,0.85); font-size: 11px; font-weight: 600;">ร้อยละ ${attempt.percentage}%</div>
                     </div>
@@ -846,8 +854,8 @@ function renderProgressChart(attempts, timeframe = 'all') {
 
     // Create glowing neon cyan gradient for fill background
     const fillGradient = ctx.createLinearGradient(0, 0, 0, 230);
-    fillGradient.addColorStop(0, 'rgba(0, 229, 255, 0.28)');
-    fillGradient.addColorStop(1, 'rgba(0, 229, 255, 0.01)');
+    fillGradient.addColorStop(0, 'rgba(0, 210, 255, 0.28)');
+    fillGradient.addColorStop(1, 'rgba(0, 210, 255, 0.01)');
 
     progressChartInstance = new Chart(ctx, {
         type: 'line',
@@ -1268,7 +1276,7 @@ function showExamResults(result) {
     const scorePercent = document.getElementById('result-score-percent');
     
     if (result.percentage >= 70) {
-        statusText.textContent = 'ผ่านการเกณฑ์ทดสอบ! 🎉';
+        statusText.textContent = 'ผ่านเกณฑ์การทดสอบ! 🎉';
         statusText.style.color = '#ffffff';
         statusText.style.fontWeight = '700';
         timerCard.style.background = 'linear-gradient(135deg, #2e7d32, #4caf50)';
@@ -1277,7 +1285,7 @@ function showExamResults(result) {
         scoreVal.style.color = '#ffffff';
         scorePercent.style.color = 'rgba(255, 255, 255, 0.9)';
     } else {
-        statusText.textContent = 'ไม่ผ่านการเกณฑ์สอบ ⚠️';
+        statusText.textContent = 'ไม่ผ่านเกณฑ์การทดสอบ ⚠️';
         statusText.style.color = '#ffffff';
         statusText.style.fontWeight = '700';
         timerCard.style.background = 'linear-gradient(135deg, #d32f2f, #ef5350)';
@@ -1446,10 +1454,10 @@ function initAdminDashboard() {
             b.style.boxShadow = '';
         });
         realtimeTab.classList.add('active');
-        realtimeTab.style.background = 'rgba(0, 210, 255, 0.15)';
-        realtimeTab.style.color = '#00d2ff';
-        realtimeTab.style.border = '1px solid rgba(0, 210, 255, 0.4)';
-        realtimeTab.style.boxShadow = '0 0 8px rgba(0, 210, 255, 0.3)';
+        realtimeTab.style.background = 'rgba(82, 124, 86, 0.15)';
+        realtimeTab.style.color = 'var(--primary-light)';
+        realtimeTab.style.border = '1px solid rgba(82, 124, 86, 0.4)';
+        realtimeTab.style.boxShadow = '0 0 8px rgba(82, 124, 86, 0.15)';
     }
     switchAdminTab('admin-realtime');
 
@@ -1523,23 +1531,23 @@ function initAdminDashboard() {
             });
             btn.classList.add('active');
             
-            // Set dynamic neon glow active styles
+            // Set dynamic professional active styles
             const qual = btn.getAttribute('data-qual');
             if (qual === 'ม.ปลาย') {
-                btn.style.background = 'rgba(255, 215, 0, 0.15)';
-                btn.style.color = '#ffd700';
-                btn.style.border = '1px solid rgba(255, 215, 0, 0.4)';
-                btn.style.boxShadow = '0 0 8px rgba(255, 215, 0, 0.3)';
+                btn.style.background = 'rgba(212, 175, 55, 0.12)';
+                btn.style.color = 'var(--secondary-color)';
+                btn.style.border = '1px solid rgba(212, 175, 55, 0.35)';
+                btn.style.boxShadow = '0 0 8px rgba(212, 175, 55, 0.15)';
             } else if (qual === 'ป.ตรี') {
-                btn.style.background = 'rgba(0, 255, 102, 0.15)';
-                btn.style.color = '#00ff66';
-                btn.style.border = '1px solid rgba(0, 255, 102, 0.4)';
-                btn.style.boxShadow = '0 0 8px rgba(0, 255, 102, 0.3)';
+                btn.style.background = 'rgba(82, 124, 86, 0.12)';
+                btn.style.color = 'var(--primary-light)';
+                btn.style.border = '1px solid rgba(82, 124, 86, 0.35)';
+                btn.style.boxShadow = '0 0 8px rgba(82, 124, 86, 0.15)';
             } else {
-                btn.style.background = 'rgba(0, 210, 255, 0.15)';
-                btn.style.color = '#00d2ff';
-                btn.style.border = '1px solid rgba(0, 210, 255, 0.4)';
-                btn.style.boxShadow = '0 0 8px rgba(0, 210, 255, 0.3)';
+                btn.style.background = 'rgba(82, 124, 86, 0.12)';
+                btn.style.color = 'var(--primary-color)';
+                btn.style.border = '1px solid rgba(82, 124, 86, 0.35)';
+                btn.style.boxShadow = '0 0 8px rgba(82, 124, 86, 0.15)';
             }
             
             if (qual) {
@@ -1643,7 +1651,7 @@ function switchAdminTab(tabId) {
             'admin-leaderboard': 'จัดอันดับคะแนนของผู้เข้าสอบทั้งหมด'
         };
         const name = tabNames[tabId] || tabId;
-        appendRealtimeActivityLog(`👤 <span style="color: #00d2ff;">แอดมิน</span> สลับหน้าเมนูหลักไปยัง: <strong>${name}</strong>`);
+        appendRealtimeActivityLog(`👤 <span style="color: #527c56;">แอดมิน</span> สลับหน้าเมนูหลักไปยัง: <strong>${name}</strong>`);
     }
 
     if (tabId === 'admin-import') {
@@ -3129,9 +3137,9 @@ function renderDatabaseCapacity() {
         bar.style.width = `${percentage.toFixed(2)}%`;
         text.textContent = `${formattedSize} / 500.00 MB (${percentage.toFixed(2)}%)`;
 
-        // Bar colors: glowing neon blue sky gradient with neon box shadow
-        bar.style.background = 'linear-gradient(90deg, #00d2ff, #0072ff)';
-        bar.style.boxShadow = '0 0 10px rgba(0, 210, 255, 0.85), 0 0 18px rgba(0, 114, 255, 0.45)';
+        // Bar colors: subtle military olive gradient
+        bar.style.background = 'linear-gradient(90deg, var(--primary-color), var(--primary-light))';
+        bar.style.boxShadow = '0 2px 5px rgba(59, 91, 62, 0.2)';
     }
 }
 
@@ -3308,8 +3316,8 @@ function initRealtimeMonitor() {
     appendRealtimeActivityLog = logEvent;
 
     if (feed.children.length === 0) {
-        logEvent(`<span style="color: #58a6ff; font-weight: 700;">🚀 เริ่มต้นการติดตามความปลอดภัยและสถานะระบบสด...</span>`);
-        logEvent(`<span style="color: #00ff66;">🟢 เชื่อมต่อกับ API Gateway สำเร็จ (Real-Time Mode)</span>`);
+        logEvent(`<span style="color: #d4af37; font-weight: 700;">🚀 เริ่มต้นการติดตามความปลอดภัยและสถานะระบบสด...</span>`);
+        logEvent(`<span style="color: #4caf50;">🟢 เชื่อมต่อกับ API Gateway สำเร็จ (Real-Time Mode)</span>`);
     }
 
     const updateStatusData = async () => {
@@ -3334,11 +3342,11 @@ function initRealtimeMonitor() {
                     
                     let statusColor = 'var(--text-main)';
                     if (u.status.includes('ข้อที่') || u.status.includes('เริ่ม')) {
-                        statusColor = '#ff0055; font-weight: 700; text-shadow: 0 0 4px rgba(255, 0, 85, 0.2);';
+                        statusColor = 'var(--accent-color); font-weight: 700;';
                     } else if (u.status.includes('จัดการระบบ') || u.status.includes('Active')) {
-                        statusColor = '#00d2ff; font-weight: 700;';
+                        statusColor = 'var(--primary-light); font-weight: 700;';
                     } else if (u.status.includes('ผลคะแนน') || u.status.includes('AI')) {
-                        statusColor = '#00ff66;';
+                        statusColor = '#4caf50; font-weight: 700;';
                     }
 
                     tr.innerHTML = `
@@ -3359,11 +3367,11 @@ function initRealtimeMonitor() {
                         if (oldStatus !== undefined) {
                             let logMsg = '';
                             if (u.status.includes('ข้อที่')) {
-                                logMsg = `✏️ <strong style="color: #ffb74d;">${escapeHtml(u.name)}</strong> ขยับการทำข้อสอบเป็น: ${escapeHtml(u.status)}`;
+                                logMsg = `✏️ <strong style="color: var(--secondary-color);">${escapeHtml(u.name)}</strong> ขยับการทำข้อสอบเป็น: ${escapeHtml(u.status)}`;
                             } else if (u.status.includes('ผลคะแนน')) {
-                                logMsg = `📊 <strong style="color: #00ff66;">${escapeHtml(u.name)}</strong> ตรวจดูคะแนนแบบประเมินและ AI feed`;
+                                logMsg = `📊 <strong style="color: #4caf50;">${escapeHtml(u.name)}</strong> ตรวจดูคะแนนแบบประเมินและ AI feed`;
                             } else if (u.status.includes('จัดการระบบ')) {
-                                logMsg = `🛡️ <strong style="color: #00d2ff;">${escapeHtml(u.name)}</strong> เข้าดู ${escapeHtml(u.status.replace('กำลังจัดการระบบ: ', ''))}`;
+                                logMsg = `🛡️ <strong style="color: var(--primary-light);">${escapeHtml(u.name)}</strong> เข้าดู ${escapeHtml(u.status.replace('กำลังจัดการระบบ: ', ''))}`;
                             } else {
                                 logMsg = `👤 <strong style="color: var(--text-sub);">${escapeHtml(u.name)}</strong> เปลี่ยนสถานะเป็น: ${escapeHtml(u.status)}`;
                             }
