@@ -1,4 +1,4 @@
-import { getQuestions, saveQuestions, getUsers, saveUsers, getConfig, saveConfig } from './store.js?v=5';
+import { getQuestions, saveQuestions, getUsers, saveUsers, getConfig, saveConfig, getAttempts, saveAttempts } from './store.js?v=5';
 
 // Helper to parse CSV robustly (handling commas within quotes, escaped quotes)
 export function parseCSV(text) {
@@ -284,4 +284,9 @@ export function deleteMember(gmail, qualification) {
     const users = getUsers();
     const updated = users.filter(u => u.gmail.toLowerCase() !== gmail.toLowerCase());
     saveUsers(updated, qualification);
+
+    // Also delete attempts of the deleted member
+    const attempts = getAttempts(qualification);
+    const updatedAttempts = attempts.filter(att => (att.userGmail || '').toLowerCase().trim() !== gmail.toLowerCase().trim());
+    saveAttempts(updatedAttempts, qualification);
 }

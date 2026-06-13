@@ -528,7 +528,7 @@ async function goToDashboard() {
                             const index = users.findIndex(u => u.gmail.toLowerCase() === user.gmail.toLowerCase());
                             if (index > -1) {
                                 users[index].profileImage = croppedBase64;
-                                saveUsers(users);
+                                saveUsers(users, user.qualification, true);
                                 
                                 // Sync specifically to the server profile image endpoint
                                 fetch('/api/update_profile_image', {

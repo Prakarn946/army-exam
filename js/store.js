@@ -602,10 +602,11 @@ export function getUsers(qualification) {
     return localCache.users[q];
 }
 
-export function saveUsers(users, qualification) {
+export function saveUsers(users, qualification, localOnly = false) {
     const q = qualification || currentActiveQualification;
     localCache.users[q] = users;
     localStorage.setItem(getScopedKey(STORE_KEYS.USERS, q), JSON.stringify(users));
+    if (localOnly) return;
     const url = q ? `/api/save_users?qualification=${encodeURIComponent(q)}` : '/api/save_users';
     fetch(url, {
         method: 'POST',
@@ -644,10 +645,11 @@ export function getAttempts(qualification) {
     return localCache.attempts[q];
 }
 
-export function saveAttempts(attempts, qualification) {
+export function saveAttempts(attempts, qualification, localOnly = false) {
     const q = qualification || currentActiveQualification;
     localCache.attempts[q] = attempts;
     localStorage.setItem(getScopedKey(STORE_KEYS.ATTEMPTS, q), JSON.stringify(attempts));
+    if (localOnly) return;
     const url = q ? `/api/save_attempts?qualification=${encodeURIComponent(q)}` : '/api/save_attempts';
     fetch(url, {
         method: 'POST',
@@ -660,7 +662,7 @@ export function addAttempt(attempt) {
     const q = attempt.qualification || currentActiveQualification;
     const attempts = getAttempts(q);
     attempts.unshift(attempt); // newest first
-    saveAttempts(attempts, q);
+    saveAttempts(attempts, q, true);
     
     // Send single attempt to server to prevent overwriting concurrency issues
     fetch('/api/add_attempt', {
