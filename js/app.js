@@ -1617,56 +1617,6 @@ function initAdminDashboard() {
         };
     }
 
-    // Bind Leaderboard qualification sub-tabs in the sidebar
-    const tabHS = document.getElementById('leaderboard-tab-hs');
-    const tabBach = document.getElementById('leaderboard-tab-bach');
-
-    if (tabHS && tabBach && !tabHS.dataset.bound) {
-        tabHS.dataset.bound = 'true';
-        tabBach.dataset.bound = 'true';
-
-        const updateLeaderboardTabStyles = () => {
-            if (leaderboardActiveQual === 'ม.ปลาย') {
-                tabHS.classList.add('active');
-                tabHS.style.background = 'rgba(255, 215, 0, 0.15)';
-                tabHS.style.color = '#ffd700';
-                tabHS.style.border = '1px solid rgba(255, 215, 0, 0.4)';
-                tabHS.style.boxShadow = '0 0 8px rgba(255, 215, 0, 0.3)';
-                
-                tabBach.classList.remove('active');
-                tabBach.style.background = 'var(--bg-main)';
-                tabBach.style.color = 'var(--text-sub)';
-                tabBach.style.border = '1px solid var(--border-color)';
-                tabBach.style.boxShadow = '';
-            } else {
-                tabBach.classList.add('active');
-                tabBach.style.background = 'rgba(0, 255, 102, 0.15)';
-                tabBach.style.color = '#00ff66';
-                tabBach.style.border = '1px solid rgba(0, 255, 102, 0.4)';
-                tabBach.style.boxShadow = '0 0 8px rgba(0, 255, 102, 0.3)';
-                
-                tabHS.classList.remove('active');
-                tabHS.style.background = 'var(--bg-main)';
-                tabHS.style.color = 'var(--text-sub)';
-                tabHS.style.border = '1px solid var(--border-color)';
-                tabHS.style.boxShadow = '';
-            }
-        };
-
-        updateLeaderboardTabStyles();
-
-        tabHS.onclick = () => {
-            leaderboardActiveQual = 'ม.ปลาย';
-            updateLeaderboardTabStyles();
-            renderLeaderboard();
-        };
-
-        tabBach.onclick = () => {
-            leaderboardActiveQual = 'ป.ตรี';
-            updateLeaderboardTabStyles();
-            renderLeaderboard();
-        };
-    }
 }
 
 function switchAdminTab(tabId) {
