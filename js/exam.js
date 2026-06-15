@@ -1,4 +1,4 @@
-import { getQuestions, getConfig, addAttempt } from './store.js?v=5';
+import { getQuestions, getConfig, addAttempt, safeLocalStorageSetItem } from './store.js?v=5';
 import { getCurrentUser } from './auth.js?v=5';
 
 const ACTIVE_EXAM_KEY = 'army_exam_active_session';
@@ -84,7 +84,7 @@ export function startNewExam() {
 
 // Save exam session state to localStorage
 export function saveActiveSession(session) {
-    localStorage.setItem(ACTIVE_EXAM_KEY, JSON.stringify(session));
+    safeLocalStorageSetItem(ACTIVE_EXAM_KEY, JSON.stringify(session));
 }
 
 // Get current active session

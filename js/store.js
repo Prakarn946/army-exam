@@ -449,6 +449,29 @@ function getScopedKey(baseKey, qualification) {
     return `${baseKey}_${q}`;
 }
 
+export function safeLocalStorageSetItem(key, value) {
+    try {
+        localStorage.setItem(key, value);
+    } catch (e) {
+        console.warn(`localStorage write failed for key "${key}":`, e);
+        if (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014 || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+            try {
+                console.log('Attempting to free up localStorage space by removing cached questions...');
+                for (let i = localStorage.length - 1; i >= 0; i--) {
+                    const k = localStorage.key(i);
+                    if (k && k.startsWith('army_exam_questions_')) {
+                        localStorage.removeItem(k);
+                    }
+                }
+                localStorage.setItem(key, value);
+                console.log(`Successfully saved key "${key}" after cleaning up cached questions.`);
+            } catch (retryError) {
+                console.error(`Failed to save key "${key}" even after cleaning up cached questions:`, retryError);
+            }
+        }
+    }
+}
+
 // Local In-Memory Cache for server sync partitioned by qualification
 let localCache = {
     questions: {},
@@ -473,7 +496,7 @@ export async function syncFromBackend(qualification, skipQuestions = false) {
             const data = await response.json();
             if (!skipQuestions) {
                 localCache.questions[q] = data.questions || [];
-                localStorage.setItem(getScopedKey(STORE_KEYS.QUESTIONS, q), JSON.stringify(localCache.questions[q]));
+                safeLocalStorageSetItem(getScopedKey(STORE_KEYS.QUESTIONS, q), JSON.stringify(localCache.questions[q]));
             }
             localCache.users[q] = data.users || [];
             localCache.config[q] = data.config || {};
@@ -481,10 +504,10 @@ export async function syncFromBackend(qualification, skipQuestions = false) {
             localCache.dbSizeBytes = data.db_size_bytes || 0;
             
             // Backup to localStorage
-            localStorage.setItem(getScopedKey(STORE_KEYS.USERS, q), JSON.stringify(localCache.users[q]));
-            localStorage.setItem(getScopedKey(STORE_KEYS.CONFIG, q), JSON.stringify(localCache.config[q]));
-            localStorage.setItem(getScopedKey(STORE_KEYS.ATTEMPTS, q), JSON.stringify(localCache.attempts[q]));
-            localStorage.setItem('army_exam_db_size_bytes', localCache.dbSizeBytes.toString());
+            safeLocalStorageSetItem(getScopedKey(STORE_KEYS.USERS, q), JSON.stringify(localCache.users[q]));
+            safeLocalStorageSetItem(getScopedKey(STORE_KEYS.CONFIG, q), JSON.stringify(localCache.config[q]));
+            safeLocalStorageSetItem(getScopedKey(STORE_KEYS.ATTEMPTS, q), JSON.stringify(localCache.attempts[q]));
+            safeLocalStorageSetItem('army_exam_db_size_bytes', localCache.dbSizeBytes.toString());
             return true;
         }
     } catch (e) {
@@ -527,10 +550,10 @@ export async function initStore(qualification) {
         localCache.attempts[q] = [];
         
         // Save to local
-        localStorage.setItem(getScopedKey(STORE_KEYS.QUESTIONS, q), JSON.stringify(DEFAULT_QUESTIONS));
-        localStorage.setItem(getScopedKey(STORE_KEYS.USERS, q), JSON.stringify(DEFAULT_USERS));
-        localStorage.setItem(getScopedKey(STORE_KEYS.CONFIG, q), JSON.stringify(DEFAULT_CONFIG));
-        localStorage.setItem(getScopedKey(STORE_KEYS.ATTEMPTS, q), JSON.stringify([]));
+        safeLocalStorageSetItem(getScopedKey(STORE_KEYS.QUESTIONS, q), JSON.stringify(DEFAULT_QUESTIONS));
+        safeLocalStorageSetItem(getScopedKey(STORE_KEYS.USERS, q), JSON.stringify(DEFAULT_USERS));
+        safeLocalStorageSetItem(getScopedKey(STORE_KEYS.CONFIG, q), JSON.stringify(DEFAULT_CONFIG));
+        safeLocalStorageSetItem(getScopedKey(STORE_KEYS.ATTEMPTS, q), JSON.stringify([]));
         
         // Sync to server only if online (isFreshServer)
         if (synced) {
@@ -554,7 +577,7 @@ export function getQuestions(qualification) {
 export function saveQuestions(questions, qualification) {
     const q = qualification || currentActiveQualification;
     localCache.questions[q] = questions;
-    localStorage.setItem(getScopedKey(STORE_KEYS.QUESTIONS, q), JSON.stringify(questions));
+    safeLocalStorageSetItem(getScopedKey(STORE_KEYS.QUESTIONS, q), JSON.stringify(questions));
     const url = q ? `/api/save_questions?qualification=${encodeURIComponent(q)}` : '/api/save_questions';
     fetch(url, {
         method: 'POST',
@@ -605,7 +628,7 @@ export function getUsers(qualification) {
 export function saveUsers(users, qualification, localOnly = false) {
     const q = qualification || currentActiveQualification;
     localCache.users[q] = users;
-    localStorage.setItem(getScopedKey(STORE_KEYS.USERS, q), JSON.stringify(users));
+    safeLocalStorageSetItem(getScopedKey(STORE_KEYS.USERS, q), JSON.stringify(users));
     if (localOnly) return;
     const url = q ? `/api/save_users?qualification=${encodeURIComponent(q)}` : '/api/save_users';
     fetch(url, {
@@ -627,7 +650,7 @@ export function getConfig(qualification) {
 export function saveConfig(config, qualification) {
     const q = qualification || currentActiveQualification;
     localCache.config[q] = config;
-    localStorage.setItem(getScopedKey(STORE_KEYS.CONFIG, q), JSON.stringify(config));
+    safeLocalStorageSetItem(getScopedKey(STORE_KEYS.CONFIG, q), JSON.stringify(config));
     const url = q ? `/api/save_config?qualification=${encodeURIComponent(q)}` : '/api/save_config';
     fetch(url, {
         method: 'POST',
@@ -648,7 +671,7 @@ export function getAttempts(qualification) {
 export function saveAttempts(attempts, qualification, localOnly = false) {
     const q = qualification || currentActiveQualification;
     localCache.attempts[q] = attempts;
-    localStorage.setItem(getScopedKey(STORE_KEYS.ATTEMPTS, q), JSON.stringify(attempts));
+    safeLocalStorageSetItem(getScopedKey(STORE_KEYS.ATTEMPTS, q), JSON.stringify(attempts));
     if (localOnly) return;
     const url = q ? `/api/save_attempts?qualification=${encodeURIComponent(q)}` : '/api/save_attempts';
     fetch(url, {
@@ -680,10 +703,10 @@ export function resetDatabase(qualification) {
     localCache.config[q] = DEFAULT_CONFIG;
     localCache.attempts[q] = [];
     
-    localStorage.setItem(getScopedKey(STORE_KEYS.QUESTIONS, q), JSON.stringify(DEFAULT_QUESTIONS));
-    localStorage.setItem(getScopedKey(STORE_KEYS.USERS, q), JSON.stringify(DEFAULT_USERS));
-    localStorage.setItem(getScopedKey(STORE_KEYS.CONFIG, q), JSON.stringify(DEFAULT_CONFIG));
-    localStorage.setItem(getScopedKey(STORE_KEYS.ATTEMPTS, q), JSON.stringify([]));
+    safeLocalStorageSetItem(getScopedKey(STORE_KEYS.QUESTIONS, q), JSON.stringify(DEFAULT_QUESTIONS));
+    safeLocalStorageSetItem(getScopedKey(STORE_KEYS.USERS, q), JSON.stringify(DEFAULT_USERS));
+    safeLocalStorageSetItem(getScopedKey(STORE_KEYS.CONFIG, q), JSON.stringify(DEFAULT_CONFIG));
+    safeLocalStorageSetItem(getScopedKey(STORE_KEYS.ATTEMPTS, q), JSON.stringify([]));
     
     saveQuestions(DEFAULT_QUESTIONS, q);
     saveUsers(DEFAULT_USERS, q);

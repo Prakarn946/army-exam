@@ -197,7 +197,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         const currentTheme = document.documentElement.getAttribute('data-theme');
         const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
         document.documentElement.setAttribute('data-theme', newTheme);
-        localStorage.setItem('theme', newTheme);
+        try {
+            localStorage.setItem('theme', newTheme);
+        } catch (e) {
+            console.warn('Failed to save theme in localStorage:', e);
+        }
         themeBtn.textContent = newTheme === 'dark' ? '☀️' : '🌙';
 
         // Re-draw chart to adapt to theme changes
