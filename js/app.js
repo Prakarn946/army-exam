@@ -357,6 +357,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    const examExitBtn = document.getElementById('exam-exit-btn');
+    if (examExitBtn) {
+        examExitBtn.addEventListener('click', () => {
+            if (confirm('⚠️ ยืนยันการออกจากห้องสอบ?\n\nการกดออกจากห้องสอบจะไม่มีการบันทึกคะแนนหรือประวัติการสอบใดๆ ในรอบนี้ คุณแน่ใจใช่หรือไม่?')) {
+                clearInterval(timerIntervalId);
+                clearActiveSession();
+                showToast('ออกจากห้องสอบแล้ว (ไม่มีการบันทึกประวัติการสอบ)', 'info');
+                goToDashboard();
+            }
+        });
+    }
+
     // Timeframe buttons click binder
     const tfContainer = document.getElementById('timeframe-buttons-container');
     if (tfContainer) {
