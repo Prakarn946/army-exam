@@ -82,13 +82,24 @@ export function startNewExam() {
     return activeSession;
 }
 
+let activeSessionCache = null;
+
 // Save exam session state to localStorage
 export function saveActiveSession(session) {
+    activeSessionCache = session;
     safeLocalStorageSetItem(ACTIVE_EXAM_KEY, JSON.stringify(session));
 }
 
 // Get current active session
 export function getActiveSession(allowExpired = false) {
+    if (activeSessionCache) {
+        if (!allowExpired && Date.now() > activeSessionCache.endTime) {
+            activeSessionCache = null;
+            return null; // Expired
+        }
+        return activeSessionCache;
+    }
+
     const sessionJson = localStorage.getItem(ACTIVE_EXAM_KEY);
     if (!sessionJson) return null;
     try {
@@ -97,6 +108,7 @@ export function getActiveSession(allowExpired = false) {
         if (!allowExpired && Date.now() > session.endTime) {
             return null; // Expired
         }
+        activeSessionCache = session;
         return session;
     } catch (e) {
         return null;
@@ -105,6 +117,7 @@ export function getActiveSession(allowExpired = false) {
 
 // Clear active session
 export function clearActiveSession() {
+    activeSessionCache = null;
     localStorage.removeItem(ACTIVE_EXAM_KEY);
 }
 
