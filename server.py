@@ -100,9 +100,9 @@ def get_db(qualification: str = None, skip_questions: bool = False):
             
         # Load attempts
         if qualification:
-            cur.execute("SELECT id, user_gmail, user_name, timestamp, total_questions, total_score, percentage, subject_stats, question_results, qualification FROM attempts WHERE qualification = %s ORDER BY timestamp DESC;", (qualification,))
+            cur.execute("SELECT id, user_gmail, user_name, timestamp, total_questions, total_score, percentage, subject_stats, qualification FROM attempts WHERE qualification = %s ORDER BY timestamp DESC;", (qualification,))
         else:
-            cur.execute("SELECT id, user_gmail, user_name, timestamp, total_questions, total_score, percentage, subject_stats, question_results, qualification FROM attempts ORDER BY timestamp DESC;")
+            cur.execute("SELECT id, user_gmail, user_name, timestamp, total_questions, total_score, percentage, subject_stats, qualification FROM attempts ORDER BY timestamp DESC;")
         attempts = []
         for r in cur.fetchall():
             attempts.append({
@@ -114,8 +114,8 @@ def get_db(qualification: str = None, skip_questions: bool = False):
                 "totalScore": r[5],
                 "percentage": int(r[6]) if r[6] is not None else 0,
                 "subjectStats": r[7],
-                "questionResults": r[8],
-                "qualification": r[9]
+                "questionResults": [],
+                "qualification": r[8]
             })
             
         # Load database size
