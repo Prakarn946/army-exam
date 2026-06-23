@@ -214,3 +214,42 @@ export function submitExam(userGmail, userName) {
 
     return attemptResult;
 }
+
+// Get passing percentage for a subject based on its base name
+export function getSubjectPassingPercentage(subjectName) {
+    if (!subjectName) return 60; // Default fallback
+    const baseSubject = subjectName.replace(/\s*\(.*?\)\s*/g, '').trim();
+    if (baseSubject === 'ความรู้ทางทหาร') return 60;
+    if (baseSubject === 'ความรู้ในการเป็นข้าราชการที่ดี') return 60;
+    if (baseSubject === 'ด้านเหตุผล') return 50;
+    if (baseSubject === 'ภาษาอังกฤษ') return 50;
+    if (baseSubject === 'การคำนวณ') return 50;
+    if (baseSubject === 'ภาษาไทย') return 40;
+    return 60; // Default fallback
+}
+
+// Check if a subject passed its specific threshold
+export function checkSubjectPass(subjectName, correctScore, totalQuestions) {
+    const pct = getSubjectPassingPercentage(subjectName);
+    const percent = totalQuestions > 0 ? (correctScore / totalQuestions) * 100 : 0;
+    return percent >= pct;
+}
+
+// Check if an attempt passed the exam criteria (each subject >= threshold AND total score >= 72)
+export function checkAttemptPass(attempt) {
+    if (!attempt) return false;
+    
+    // 1. Total score must be >= 72
+    if ((attempt.totalScore || 0) < 72) return false;
+
+    // 2. All subjects must pass their individual thresholds
+    if (attempt.subjectStats) {
+        for (const subject in attempt.subjectStats) {
+            const stats = attempt.subjectStats[subject];
+            if (!checkSubjectPass(subject, stats.correct, stats.total)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}

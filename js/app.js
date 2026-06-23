@@ -1,6 +1,6 @@
 import { initStore, getQuestions, saveQuestions, getAttempts, getConfig, saveConfig, resetDatabase, getSubjects, getUsers, saveUsers, syncFromBackend, saveAttempts, getDbSizeBytes, setActiveQualification } from './store.js?v=5';
 import { registerUser, loginUser, logoutUser, getCurrentUser, isAdmin, isLoggedIn } from './auth.js?v=5';
-import { startNewExam, getActiveSession, answerQuestion, toggleMarkForReview, submitExam, clearActiveSession, saveActiveSession } from './exam.js?v=5';
+import { startNewExam, getActiveSession, answerQuestion, toggleMarkForReview, submitExam, clearActiveSession, saveActiveSession, checkSubjectPass, checkAttemptPass } from './exam.js?v=5';
 import { saveQuestionItem, deleteQuestionItem, saveSubjectConfig, saveExamDuration, addMember, updateMember, deleteMember, syncFromGoogleSheets, updateSubjectConfigs } from './admin.js?v=5';
 
 // Global app state
@@ -728,7 +728,7 @@ function renderAttemptsHistory(userGmail) {
                 hour: '2-digit', minute: '2-digit'
             });
 
-            const isPassed = attempt.percentage >= 70;
+            const isPassed = checkAttemptPass(attempt);
             const scoreBg = isPassed 
                 ? 'linear-gradient(135deg, #2e7d32, #4caf50)' 
                 : 'linear-gradient(135deg, #d32f2f, #ef5350)';
@@ -979,9 +979,9 @@ function generateAIRecommendation(attempts, timeframe = 'all') {
             });
         }
 
-        let overallText = pct >= 70 
-            ? `🎉 ยินดีด้วยครับ! ผลการทดสอบในช่วงเวลา <strong>${tfText}</strong> ของคุณอยู่ในเกณฑ์ <strong>สอบผ่านเกณฑ์มาตรฐาน</strong> โดยทำคะแนนได้ร้อยละ <strong>${pct}%</strong>`
-            : `⚠️ ผลการสอบในช่วงเวลา <strong>${tfText}</strong> ของคุณทำคะแนนเฉลี่ยร้อยละ <strong>${pct}%</strong> ซึ่ง<strong>ยังต่ำกว่าเกณฑ์มาตรฐานผ่านการประเมิน (70%)</strong> เล็กน้อย แต่อย่าเพิ่งท้อถอยนะครับ นี่เป็นเพียงจุดเริ่มต้นของการเรียนรู้`;
+        let overallText = checkAttemptPass(last) 
+            ? `🎉 ยินดีด้วยครับ! ผลการทดสอบในช่วงเวลา <strong>${tfText}</strong> ของคุณอยู่ในเกณฑ์ <strong>สอบผ่านเกณฑ์มาตรฐาน</strong> โดยทำคะแนนรวมได้ <strong>${last.totalScore} คะแนน</strong> (ร้อยละ ${pct}%)`
+            : `⚠️ ผลการสอบในช่วงเวลา <strong>${tfText}</strong> ของคุณทำคะแนนเฉลี่ยร้อยละ <strong>${pct}%</strong> ซึ่ง<strong>ยังต่ำกว่าเกณฑ์มาตรฐานผ่านการประเมิน (รายวิชาผ่าน 40%-60% และคะแนนรวมต้องได้ 72 คะแนนขึ้นไป)</strong> เล็กน้อย แต่อย่าเพิ่งท้อถอยนะครับ`;
 
         let subjectAnalysis = '';
         if (strongest && weakest) {
@@ -1291,7 +1291,7 @@ function showExamResults(result) {
     const scoreVal = document.getElementById('result-score-ratio');
     const scorePercent = document.getElementById('result-score-percent');
     
-    if (result.percentage >= 70) {
+    if (checkAttemptPass(result)) {
         statusText.textContent = 'ผ่านเกณฑ์การทดสอบ! 🎉';
         statusText.style.color = '#ffffff';
         statusText.style.fontWeight = '700';
@@ -1327,7 +1327,7 @@ function showExamResults(result) {
                 <span style="font-weight: 700; font-size: 13px; color: var(--text-main);">${subject}</span>
                 <span style="font-size: 11px; color: var(--text-sub);">คะแนนวิชานี้</span>
             </div>
-            <div style="font-size: 18px; font-weight: 800; color: ${percent >= 70 ? 'var(--primary-color)' : 'var(--accent-color)'};">
+            <div style="font-size: 18px; font-weight: 800; color: ${checkSubjectPass(subject, stats.correct, stats.total) ? 'var(--primary-color)' : 'var(--accent-color)'};">
                 ${stats.correct} <span style="font-size: 13px; font-weight: 600; color: var(--text-sub);">/ ${stats.total}</span>
             </div>
         `;
