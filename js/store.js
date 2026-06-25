@@ -478,7 +478,8 @@ let localCache = {
     users: {},
     config: {},
     attempts: {},
-    dbSizeBytes: 0
+    dbSizeBytes: 0,
+    isOfflineDefaults: {}
 };
 
 // Sync from backend
@@ -508,6 +509,7 @@ export async function syncFromBackend(qualification, skipQuestions = false) {
             safeLocalStorageSetItem(getScopedKey(STORE_KEYS.CONFIG, q), JSON.stringify(localCache.config[q]));
             safeLocalStorageSetItem(getScopedKey(STORE_KEYS.ATTEMPTS, q), JSON.stringify(localCache.attempts[q]));
             safeLocalStorageSetItem('army_exam_db_size_bytes', localCache.dbSizeBytes.toString());
+            localCache.isOfflineDefaults[q] = false;
             return true;
         }
     } catch (e) {
@@ -522,6 +524,9 @@ export async function syncFromBackend(qualification, skipQuestions = false) {
     localCache.config[q] = JSON.parse(localStorage.getItem(getScopedKey(STORE_KEYS.CONFIG, q))) || DEFAULT_CONFIG;
     localCache.attempts[q] = JSON.parse(localStorage.getItem(getScopedKey(STORE_KEYS.ATTEMPTS, q))) || [];
     localCache.dbSizeBytes = parseInt(localStorage.getItem('army_exam_db_size_bytes') || '0');
+    
+    // Set offline default protection flag
+    localCache.isOfflineDefaults[q] = true;
     return false;
 }
 
@@ -578,6 +583,10 @@ export function saveQuestions(questions, qualification) {
     const q = qualification || currentActiveQualification;
     localCache.questions[q] = questions;
     safeLocalStorageSetItem(getScopedKey(STORE_KEYS.QUESTIONS, q), JSON.stringify(questions));
+    if (localCache.isOfflineDefaults[q]) {
+        console.warn(`Prevented overwriting server questions with offline defaults/stale cache for ${q}`);
+        return;
+    }
     const url = q ? `/api/save_questions?qualification=${encodeURIComponent(q)}` : '/api/save_questions';
     fetch(url, {
         method: 'POST',
@@ -630,6 +639,10 @@ export function saveUsers(users, qualification, localOnly = false) {
     localCache.users[q] = users;
     safeLocalStorageSetItem(getScopedKey(STORE_KEYS.USERS, q), JSON.stringify(users));
     if (localOnly) return;
+    if (localCache.isOfflineDefaults[q]) {
+        console.warn(`Prevented overwriting server users with offline defaults/stale cache for ${q}`);
+        return;
+    }
     const url = q ? `/api/save_users?qualification=${encodeURIComponent(q)}` : '/api/save_users';
     fetch(url, {
         method: 'POST',
@@ -651,6 +664,10 @@ export function saveConfig(config, qualification) {
     const q = qualification || currentActiveQualification;
     localCache.config[q] = config;
     safeLocalStorageSetItem(getScopedKey(STORE_KEYS.CONFIG, q), JSON.stringify(config));
+    if (localCache.isOfflineDefaults[q]) {
+        console.warn(`Prevented overwriting server config with offline defaults/stale cache for ${q}`);
+        return;
+    }
     const url = q ? `/api/save_config?qualification=${encodeURIComponent(q)}` : '/api/save_config';
     fetch(url, {
         method: 'POST',
@@ -673,6 +690,10 @@ export function saveAttempts(attempts, qualification, localOnly = false) {
     localCache.attempts[q] = attempts;
     safeLocalStorageSetItem(getScopedKey(STORE_KEYS.ATTEMPTS, q), JSON.stringify(attempts));
     if (localOnly) return;
+    if (localCache.isOfflineDefaults[q]) {
+        console.warn(`Prevented overwriting server attempts with offline defaults/stale cache for ${q}`);
+        return;
+    }
     const url = q ? `/api/save_attempts?qualification=${encodeURIComponent(q)}` : '/api/save_attempts';
     fetch(url, {
         method: 'POST',
