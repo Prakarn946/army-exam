@@ -136,7 +136,7 @@ export async function syncFromGoogleSheets(url, mode = 'append', subjectFilter =
         });
     }
 
-    const currentQuestions = getQuestions();
+    const currentQuestions = getQuestions(qualification);
     let finalQuestions = [];
 
     if (subjectFilter === 'all') {
@@ -177,8 +177,8 @@ export async function syncFromGoogleSheets(url, mode = 'append', subjectFilter =
 
 // Update subject configuration keys if new subjects are added
 export function updateSubjectConfigs(qualification) {
-    const questions = getQuestions();
-    const config = getConfig();
+    const questions = getQuestions(qualification);
+    const config = getConfig(qualification);
     
     // Get unique subjects
     const subjects = new Set();
@@ -201,8 +201,8 @@ export function updateSubjectConfigs(qualification) {
 
 // Add/Update individual question
 export function saveQuestionItem(questionData, qualification) {
-    const questions = getQuestions();
     const qScope = qualification || questionData.qualification;
+    const questions = getQuestions(qScope);
     
     if (questionData.id) {
         // Edit mode
@@ -225,7 +225,7 @@ export function saveQuestionItem(questionData, qualification) {
 
 // Delete question
 export function deleteQuestionItem(id, qualification) {
-    const questions = getQuestions();
+    const questions = getQuestions(qualification);
     const updated = questions.filter(q => q.id !== id);
     saveQuestions(updated, qualification);
     updateSubjectConfigs(qualification);
@@ -233,21 +233,21 @@ export function deleteQuestionItem(id, qualification) {
 
 // Save Subject Config Questions Limit
 export function saveSubjectConfig(subject, count, qualification) {
-    const config = getConfig();
+    const config = getConfig(qualification);
     config[subject] = parseInt(count) || 0;
     saveConfig(config, qualification);
 }
 
 // Save Duration Limit
 export function saveExamDuration(minutes, qualification) {
-    const config = getConfig();
+    const config = getConfig(qualification);
     config.durationMinutes = parseInt(minutes) || 180;
     saveConfig(config, qualification);
 }
 
 // Add Member/User
 export function addMember(gmail, password, name, role = 'candidate', qualification) {
-    const users = getUsers();
+    const users = getUsers(qualification);
     const exists = users.some(u => u.gmail.toLowerCase() === gmail.toLowerCase());
     
     if (exists) {
@@ -269,7 +269,7 @@ export function addMember(gmail, password, name, role = 'candidate', qualificati
 
 // Update Member/User
 export function updateMember(gmail, updateData, qualification) {
-    const users = getUsers();
+    const users = getUsers(qualification);
     const index = users.findIndex(u => u.gmail.toLowerCase() === gmail.toLowerCase());
     if (index > -1) {
         users[index] = { ...users[index], ...updateData };
@@ -281,7 +281,7 @@ export function updateMember(gmail, updateData, qualification) {
 
 // Delete Member/User
 export function deleteMember(gmail, qualification) {
-    const users = getUsers();
+    const users = getUsers(qualification);
     const updated = users.filter(u => u.gmail.toLowerCase() !== gmail.toLowerCase());
     saveUsers(updated, qualification);
 

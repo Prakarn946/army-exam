@@ -1,4 +1,4 @@
-import { initStore, getQuestions, saveQuestions, getAttempts, getConfig, saveConfig, resetDatabase, getSubjects, getUsers, saveUsers, syncFromBackend, saveAttempts, getDbSizeBytes, setActiveQualification } from './store.js?v=5';
+import { initStore, getQuestions, saveQuestions, getAttempts, getConfig, saveConfig, resetDatabase, getSubjects, getUsers, saveUsers, syncFromBackend, saveAttempts, getDbSizeBytes, setActiveQualification, ensureQuestionsSynced } from './store.js?v=5';
 import { registerUser, loginUser, logoutUser, getCurrentUser, isAdmin, isLoggedIn } from './auth.js?v=5';
 import { startNewExam, getActiveSession, answerQuestion, toggleMarkForReview, submitExam, clearActiveSession, saveActiveSession, checkSubjectPass, checkAttemptPass } from './exam.js?v=5';
 import { saveQuestionItem, deleteQuestionItem, saveSubjectConfig, saveExamDuration, addMember, updateMember, deleteMember, syncFromGoogleSheets, updateSubjectConfigs } from './admin.js?v=5';
@@ -1680,7 +1680,7 @@ function switchAdminTab(tabId) {
 
 // TAB 1: Render configuration allocations
 function renderAdminSubjectConfigs() {
-    const config = getConfig();
+    const config = getConfig(activeQualificationScope);
     const container = document.getElementById('admin-config-subjects-container');
     container.innerHTML = '';
 
@@ -1708,10 +1708,10 @@ function renderAdminSubjectConfigs() {
     }
 
     // Get all current subjects in store
-    const subjects = getSubjects();
+    const subjects = getSubjects(activeQualificationScope);
 
     const createSubjectRow = (subject = '', limit = 5) => {
-        const total = getQuestions().filter(q => q.subject === subject).length;
+        const total = getQuestions(activeQualificationScope).filter(q => q.subject === subject).length;
         const row = document.createElement('div');
         row.className = 'config-subject-row';
         row.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 16px; background: var(--bg-main); padding: 12px 16px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); flex-wrap: wrap; transition: opacity 0.2s ease, border-color 0.2s ease;';
@@ -1766,7 +1766,7 @@ function renderAdminSubjectConfigs() {
             const currentName = nameInput.value.trim();
             const originalName = nameInput.getAttribute('data-original-name');
             const targetName = currentName || originalName || 'วิชาใหม่';
-            const qCount = getQuestions().filter(q => q.subject === targetName).length;
+            const qCount = getQuestions(activeQualificationScope).filter(q => q.subject === targetName).length;
             
             if (qCount > 0) {
                 if (!confirm(`⚠️ วิชา "${targetName}" มีข้อสอบอยู่ในคลังทั้งหมด ${qCount} ข้อ!\nการลบวิชานี้จะลบโควตาจัดสรรและตัวกรองออก แต่คำถามในคลังจะยังคงถูกเก็บไว้โดยไม่มีการลบออกจากระบบ\n\nยืนยันการลบวิชานี้ใช่หรือไม่?`)) {
@@ -1814,7 +1814,7 @@ function renderAdminSubjectConfigs() {
             subjectOrder: []
         };
 
-        const questions = getQuestions();
+        const questions = getQuestions(activeQualificationScope);
         let questionsUpdated = false;
 
         // Validations for duplicates and empty names
@@ -1885,7 +1885,7 @@ function renderAdminQuestionsList() {
     const expandedFolders = window.expandedFoldersCache;
 
     const render = () => {
-        const questions = getQuestions();
+        const questions = getQuestions(activeQualificationScope);
         const search = searchInput.value.toLowerCase();
         const subjFilter = filterSelect.value;
 
@@ -2007,9 +2007,14 @@ function renderAdminQuestionsList() {
                         openQuestionModal(q);
                     };
 
-                    tr.querySelector('.delete-question-btn').onclick = (e) => {
+                    tr.querySelector('.delete-question-btn').onclick = async (e) => {
                         e.stopPropagation();
                         if (confirm(`คุณต้องการลบข้อสอบ: "${q.question.substr(0, 40)}..." ใช่หรือไม่?`)) {
+                            const synced = await ensureQuestionsSynced(activeQualificationScope);
+                            if (!synced) {
+                                showToast('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์เพื่อลบข้อสอบได้', 'error');
+                                return;
+                            }
                             deleteQuestionItem(q.id, activeQualificationScope);
                             showToast('ลบข้อสอบออกจากคลังสำเร็จแล้ว');
                             renderAdminQuestionsList();
@@ -2040,10 +2045,15 @@ function renderAdminQuestionsList() {
                 });
 
                 // Delete Folder click handler
-                folderHeader.querySelector('.delete-folder-btn').onclick = (e) => {
+                folderHeader.querySelector('.delete-folder-btn').onclick = async (e) => {
                     e.stopPropagation();
                     const confirmMsg = `⚠️ ยืนยันการลบโฟลเดอร์ "${folderName}" ในวิชา "${subjName}" ใช่หรือไม่?\nการดำเนินการนี้จะลบข้อสอบทั้งหมดในโฟลเดอร์นี้จำนวน ${folderQuestions.length} ข้อออกจากระบบแบบถาวร!`;
                     if (confirm(confirmMsg)) {
+                        const synced = await ensureQuestionsSynced(activeQualificationScope);
+                        if (!synced) {
+                            showToast('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์เพื่อลบโฟลเดอร์ข้อสอบได้', 'error');
+                            return;
+                        }
                         deleteQuestionsFolder(subjName, folderName);
                     }
                 };
@@ -2083,7 +2093,7 @@ function renderAdminQuestionsList() {
 }
 
 function deleteQuestionsFolder(subject, folderName) {
-    const questions = getQuestions();
+    const questions = getQuestions(activeQualificationScope);
     const updated = questions.filter(q => {
         const qSubject = q.subject || 'วิชาทั่วไป';
         const qFolder = q.sourceFile || 'คำถามทั่วไป (เพิ่มด้วยตนเอง)';
@@ -2155,8 +2165,16 @@ function openQuestionModal(questionData = null, isPreview = false, previewIndex 
     modal.style.display = 'flex';
 
     // Binds Modal Form Save Submit
-    form.onsubmit = (e) => {
+    form.onsubmit = async (e) => {
         e.preventDefault();
+        
+        if (!isPreview) {
+            const synced = await ensureQuestionsSynced(activeQualificationScope);
+            if (!synced) {
+                showToast('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์เพื่อบันทึกข้อสอบได้', 'error');
+                return;
+            }
+        }
         
         const qId = document.getElementById('modal-q-id').value;
         const newQuestion = {
@@ -2713,6 +2731,11 @@ function bindImportExportElements() {
         importBtn.textContent = '🔄 กำลังดึงข้อมูลและประมวลผล...';
 
         try {
+            const synced = await ensureQuestionsSynced(activeQualificationScope);
+            if (!synced) {
+                showToast('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์เพื่อตรวจสอบคลังข้อสอบปัจจุบันได้ กรุณาลองใหม่อีกครั้ง', 'error');
+                return;
+            }
             const count = await syncFromGoogleSheets(url, mode, subjectFilter, activeQualificationScope);
             if (subjectFilter === 'all') {
                 showToast(`นำเข้าข้อสอบจาก Google Sheets สำเร็จ! รวมนำเข้าได้ ${count} ข้อ`);
@@ -2733,7 +2756,7 @@ function bindImportExportElements() {
 
     // 2. Export JSON File download
     document.getElementById('export-questions-btn').onclick = () => {
-        const questions = getQuestions();
+        const questions = getQuestions(activeQualificationScope);
         const dataStr = JSON.stringify(questions, null, 2);
         const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
         
@@ -2760,7 +2783,7 @@ function bindImportExportElements() {
         if (!file) return;
 
         const reader = new FileReader();
-        reader.onload = (evt) => {
+        reader.onload = async (evt) => {
             try {
                 const parsed = JSON.parse(evt.target.result);
                 if (!Array.isArray(parsed)) {
@@ -2802,7 +2825,12 @@ function bindImportExportElements() {
                 }
 
                 if (confirm(confirmMsg)) {
-                    const current = getQuestions();
+                    const synced = await ensureQuestionsSynced(activeQualificationScope);
+                    if (!synced) {
+                        showToast('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์เพื่อตรวจสอบคลังข้อสอบปัจจุบันได้', 'error');
+                        return;
+                    }
+                    const current = getQuestions(activeQualificationScope);
                     let finalQuestions = [];
 
                     // Apply subject overrides if necessary
@@ -3020,7 +3048,7 @@ function bindImportExportElements() {
     // Confirm file import
     const confirmImportBtn = document.getElementById('confirm-file-import-btn');
     if (confirmImportBtn) {
-        confirmImportBtn.onclick = () => {
+        confirmImportBtn.onclick = async () => {
             if (tempFileQuestions.length === 0) return;
             
             const fileModeRadio = document.querySelector('input[name="import-file-mode"]:checked');
@@ -3041,7 +3069,12 @@ function bindImportExportElements() {
             }
             
             if (confirm(confirmMsg)) {
-                const current = getQuestions();
+                const synced = await ensureQuestionsSynced(activeQualificationScope);
+                if (!synced) {
+                    showToast('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์เพื่อตรวจสอบคลังข้อสอบปัจจุบันได้', 'error');
+                    return;
+                }
+                const current = getQuestions(activeQualificationScope);
                 let finalQuestions = [];
                 
                 // Override subjects if specific subject selected

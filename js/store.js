@@ -479,7 +479,10 @@ let localCache = {
     config: {},
     attempts: {},
     dbSizeBytes: 0,
-    isOfflineDefaults: {}
+    isOfflineDefaults: {},
+    questionsSynced: {},
+    usersSynced: {},
+    configSynced: {}
 };
 
 // Sync from backend
@@ -498,6 +501,7 @@ export async function syncFromBackend(qualification, skipQuestions = false) {
             if (!skipQuestions) {
                 localCache.questions[q] = data.questions || [];
                 safeLocalStorageSetItem(getScopedKey(STORE_KEYS.QUESTIONS, q), JSON.stringify(localCache.questions[q]));
+                localCache.questionsSynced[q] = true;
             }
             localCache.users[q] = data.users || [];
             localCache.config[q] = data.config || {};
@@ -510,6 +514,8 @@ export async function syncFromBackend(qualification, skipQuestions = false) {
             safeLocalStorageSetItem(getScopedKey(STORE_KEYS.ATTEMPTS, q), JSON.stringify(localCache.attempts[q]));
             safeLocalStorageSetItem('army_exam_db_size_bytes', localCache.dbSizeBytes.toString());
             localCache.isOfflineDefaults[q] = false;
+            localCache.usersSynced[q] = true;
+            localCache.configSynced[q] = true;
             return true;
         }
     } catch (e) {
@@ -532,6 +538,39 @@ export async function syncFromBackend(qualification, skipQuestions = false) {
 
 export function getDbSizeBytes() {
     return localCache.dbSizeBytes || parseInt(localStorage.getItem('army_exam_db_size_bytes') || '0');
+}
+
+export async function ensureQuestionsSynced(qualification) {
+    const q = qualification || currentActiveQualification;
+    if (localCache.questionsSynced[q]) {
+        return true;
+    }
+    try {
+        const response = await fetch(`/api/db?qualification=${encodeURIComponent(q)}`);
+        if (response.ok) {
+            const data = await response.json();
+            localCache.questions[q] = data.questions || [];
+            safeLocalStorageSetItem(getScopedKey(STORE_KEYS.QUESTIONS, q), JSON.stringify(localCache.questions[q]));
+            localCache.users[q] = data.users || [];
+            localCache.config[q] = data.config || {};
+            localCache.attempts[q] = data.attempts || [];
+            localCache.dbSizeBytes = data.db_size_bytes || 0;
+            
+            safeLocalStorageSetItem(getScopedKey(STORE_KEYS.USERS, q), JSON.stringify(localCache.users[q]));
+            safeLocalStorageSetItem(getScopedKey(STORE_KEYS.CONFIG, q), JSON.stringify(localCache.config[q]));
+            safeLocalStorageSetItem(getScopedKey(STORE_KEYS.ATTEMPTS, q), JSON.stringify(localCache.attempts[q]));
+            safeLocalStorageSetItem('army_exam_db_size_bytes', localCache.dbSizeBytes.toString());
+            
+            localCache.questionsSynced[q] = true;
+            localCache.usersSynced[q] = true;
+            localCache.configSynced[q] = true;
+            localCache.isOfflineDefaults[q] = false;
+            return true;
+        }
+    } catch (e) {
+        console.error(`ensureQuestionsSynced error:`, e);
+    }
+    return false;
 }
 
 // Initialize Store

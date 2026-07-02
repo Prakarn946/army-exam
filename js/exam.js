@@ -1,4 +1,4 @@
-import { getQuestions, getConfig, addAttempt, safeLocalStorageSetItem } from './store.js?v=5';
+import { getQuestions, getConfig, addAttempt, safeLocalStorageSetItem, getActiveQualification } from './store.js?v=5';
 import { getCurrentUser } from './auth.js?v=5';
 
 const ACTIVE_EXAM_KEY = 'army_exam_active_session';
@@ -15,8 +15,10 @@ function shuffleArray(array) {
 
 // Generate new exam session
 export function startNewExam() {
-    const questions = getQuestions();
-    const config = getConfig();
+    const currentUser = getCurrentUser();
+    const q = currentUser ? (currentUser.role === 'admin' ? getActiveQualification() : currentUser.qualification) : 'ม.ปลาย';
+    const questions = getQuestions(q);
+    const config = getConfig(q);
     const selectedQuestions = [];
 
     // 1. Get questions per subject as configured in custom order
