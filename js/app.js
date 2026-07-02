@@ -1872,6 +1872,23 @@ function renderAdminSubjectConfigs() {
     };
 }
 
+function formatThaiDateTime(isoString) {
+    if (!isoString) return '';
+    try {
+        const date = new Date(isoString);
+        if (isNaN(date.getTime())) return '';
+        return date.toLocaleDateString('th-TH', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        }) + ' น.';
+    } catch (e) {
+        return '';
+    }
+}
+
 // TAB 2: Renders Questions CRUD Table as folders
 function renderAdminQuestionsList() {
     const foldersContainer = document.getElementById('admin-questions-folders-container');
@@ -1906,18 +1923,21 @@ function renderAdminQuestionsList() {
             return;
         }
 
-        // Group by subject and then by folder (sourceFile)
+        // Group by subject and then by folder key (sourceFile + "||" + createdAt)
         const groups = {};
         filtered.forEach(q => {
             const subj = q.subject || 'วิชาทั่วไป';
-            const folder = q.sourceFile || 'คำถามทั่วไป (เพิ่มด้วยตนเอง)';
+            const folderName = q.sourceFile || 'คำถามทั่วไป (เพิ่มด้วยตนเอง)';
+            const uploadTime = q.createdAt || '';
+            const folderKey = `${folderName}||${uploadTime}`;
+            
             if (!groups[subj]) {
                 groups[subj] = {};
             }
-            if (!groups[subj][folder]) {
-                groups[subj][folder] = [];
+            if (!groups[subj][folderKey]) {
+                groups[subj][folderKey] = [];
             }
-            groups[subj][folder].push(q);
+            groups[subj][folderKey].push(q);
         });
 
         // Render each subject
@@ -1933,9 +1953,17 @@ function renderAdminQuestionsList() {
             subjectSection.appendChild(subjectHeader);
 
             const folderGroup = groups[subjName];
-            Object.keys(folderGroup).sort().forEach(folderName => {
-                const folderQuestions = folderGroup[folderName];
-                const folderId = `${subjName}::${folderName}`;
+            // Sort folders by createdAt descending (newest first)
+            Object.keys(folderGroup).sort((a, b) => {
+                const timeA = a.split('||')[1] || '';
+                const timeB = b.split('||')[1] || '';
+                return timeB.localeCompare(timeA);
+            }).forEach(folderKey => {
+                const folderQuestions = folderGroup[folderKey];
+                const parts = folderKey.split('||');
+                const folderName = parts[0];
+                const uploadTime = parts[1];
+                const folderId = `${subjName}::${folderKey}`;
                 
                 const folderCard = document.createElement('div');
                 folderCard.className = 'folder-card';
@@ -1948,11 +1976,16 @@ function renderAdminQuestionsList() {
                 folderHeader.className = 'folder-header';
                 folderHeader.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--bg-main); cursor: pointer; user-select: none; flex-wrap: wrap; gap: 10px;';
                 
+                const formattedDate = uploadTime ? `อัปโหลดเมื่อ: ${formatThaiDateTime(uploadTime)}` : '(เพิ่มด้วยตนเอง)';
+                
                 folderHeader.innerHTML = `
-                    <div class="folder-title" style="display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13.5px; color: var(--text-main);">
-                        <span>📁</span>
-                        <span>${escapeHtml(folderName)}</span>
-                        <span class="badge warning" style="margin-left: 6px; font-size: 10px;">${folderQuestions.length} ข้อ</span>
+                    <div class="folder-title" style="display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 13.5px; color: var(--text-main);">
+                        <span style="font-size: 20px;">📁</span>
+                        <div style="display: flex; flex-direction: column; gap: 2px;">
+                            <span style="font-size: 14px;">${escapeHtml(folderName)}</span>
+                            <span style="font-size: 11px; color: var(--text-sub); font-weight: normal;">${formattedDate}</span>
+                        </div>
+                        <span class="badge warning" style="margin-left: 6px; font-size: 10px; height: 18px; display: inline-flex; align-items: center;">${folderQuestions.length} ข้อ</span>
                     </div>
                     <div class="folder-actions" style="display: flex; align-items: center; gap: 8px;">
                         <button type="button" class="btn-xs delete delete-folder-btn" style="padding: 6px 12px; font-size: 11px; margin: 0;">🗑️ ลบโฟลเดอร์</button>
@@ -2054,7 +2087,7 @@ function renderAdminQuestionsList() {
                             showToast('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์เพื่อลบโฟลเดอร์ข้อสอบได้', 'error');
                             return;
                         }
-                        deleteQuestionsFolder(subjName, folderName);
+                        deleteQuestionsFolder(subjName, folderKey);
                     }
                 };
 
@@ -2092,14 +2125,20 @@ function renderAdminQuestionsList() {
     renderDatabaseCapacity();
 }
 
-function deleteQuestionsFolder(subject, folderName) {
+function deleteQuestionsFolder(subject, folderKey) {
+    const parts = folderKey.split('||');
+    const folderName = parts[0];
+    const uploadTime = parts[1] || '';
+    
     const questions = getQuestions(activeQualificationScope);
     const updated = questions.filter(q => {
         const qSubject = q.subject || 'วิชาทั่วไป';
         const qFolder = q.sourceFile || 'คำถามทั่วไป (เพิ่มด้วยตนเอง)';
+        const qTime = q.createdAt || '';
         
         const isTarget = (qSubject.toLowerCase() === subject.toLowerCase()) && 
-                         (folderName === 'คำถามทั่วไป (เพิ่มด้วยตนเอง)' ? !q.sourceFile : (qFolder === folderName));
+                         (qFolder === folderName) && 
+                         (qTime === uploadTime);
         return !isTarget;
     });
 
@@ -2200,8 +2239,9 @@ function openQuestionModal(questionData = null, isPreview = false, previewIndex 
         } else {
             if (qId) {
                 newQuestion.id = qId;
-                if (questionData && questionData.sourceFile) {
-                    newQuestion.sourceFile = questionData.sourceFile;
+                if (questionData) {
+                    if (questionData.sourceFile) newQuestion.sourceFile = questionData.sourceFile;
+                    if (questionData.createdAt) newQuestion.createdAt = questionData.createdAt;
                 }
             }
 
@@ -2790,9 +2830,13 @@ function bindImportExportElements() {
                     throw new Error('โครงสร้างไฟล์ไม่ถูกต้อง: ต้องอยู่ในรูป Array ข้อมูล');
                 }
 
+                const uploadTime = new Date().toISOString();
                 parsed.forEach(newQ => {
                     if (!newQ.sourceFile) {
                         newQ.sourceFile = file.name;
+                    }
+                    if (!newQ.createdAt) {
+                        newQ.createdAt = uploadTime;
                     }
                     newQ.qualification = activeQualificationScope;
                 });
@@ -3076,6 +3120,16 @@ function bindImportExportElements() {
                 }
                 const current = getQuestions(activeQualificationScope);
                 let finalQuestions = [];
+                
+                const uploadTime = new Date().toISOString();
+                tempFileQuestions.forEach(q => {
+                    if (!q.createdAt) {
+                        q.createdAt = uploadTime;
+                    }
+                    if (!q.sourceFile) {
+                        q.sourceFile = tempImportFileName || 'ไฟล์นำเข้าชั่วคราว';
+                    }
+                });
                 
                 // Override subjects if specific subject selected
                 if (subjectFilter !== 'all') {

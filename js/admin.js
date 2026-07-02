@@ -123,10 +123,12 @@ export async function syncFromGoogleSheets(url, mode = 'append', subjectFilter =
     const rows = parseCSV(text);
     let parsedQuestions = mapCSVRowsToQuestions(rows);
 
-    // Tag each question with sourceFile and qualification
+    // Tag each question with sourceFile, qualification and createdAt
+    const uploadTime = new Date().toISOString();
     parsedQuestions.forEach(q => {
         q.sourceFile = "Google Sheets Sync";
         q.qualification = qualification;
+        q.createdAt = uploadTime;
     });
 
     // If targeting a specific subject, override all imported questions' subject to subjectFilter
@@ -208,13 +210,22 @@ export function saveQuestionItem(questionData, qualification) {
         // Edit mode
         const index = questions.findIndex(q => q.id === questionData.id);
         if (index > -1) {
-            questions[index] = { ...questions[index], ...questionData };
+            questions[index] = { 
+                ...questions[index], 
+                ...questionData,
+                sourceFile: questionData.sourceFile || questions[index].sourceFile || 'คำถามทั่วไป (เพิ่มด้วยตนเอง)',
+                createdAt: questionData.createdAt || questions[index].createdAt || new Date().toISOString()
+            };
         } else {
+            if (!questionData.sourceFile) questionData.sourceFile = 'คำถามทั่วไป (เพิ่มด้วยตนเอง)';
+            if (!questionData.createdAt) questionData.createdAt = new Date().toISOString();
             questions.push(questionData);
         }
     } else {
         // Add mode
         questionData.id = 'q_' + Date.now();
+        if (!questionData.sourceFile) questionData.sourceFile = 'คำถามทั่วไป (เพิ่มด้วยตนเอง)';
+        if (!questionData.createdAt) questionData.createdAt = new Date().toISOString();
         questions.push(questionData);
     }
 
