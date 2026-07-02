@@ -84,9 +84,9 @@ def get_db(qualification: str = None, skip_questions: bool = False):
         questions = []
         if not skip_questions:
             if qualification:
-                cur.execute("SELECT id, subject, question, options, correct, explanation, qualification FROM questions WHERE qualification = %s;", (qualification,))
+                cur.execute("SELECT id, subject, question, options, correct, explanation, qualification, source_file, created_at FROM questions WHERE qualification = %s;", (qualification,))
             else:
-                cur.execute("SELECT id, subject, question, options, correct, explanation, qualification FROM questions;")
+                cur.execute("SELECT id, subject, question, options, correct, explanation, qualification, source_file, created_at FROM questions;")
             for r in cur.fetchall():
                 questions.append({
                     "id": r[0],
@@ -94,8 +94,10 @@ def get_db(qualification: str = None, skip_questions: bool = False):
                     "question": r[2],
                     "options": r[3],
                     "correct": r[4],
-                    "explanation": r[5],
-                    "qualification": r[6]
+                    "explanation": r[5] or "",
+                    "qualification": r[6],
+                    "sourceFile": r[7] or "คำถามทั่วไป (เพิ่มด้วยตนเอง)",
+                    "createdAt": r[8].isoformat() if hasattr(r[8], 'isoformat') else str(r[8] or "")
                 })
             
         # Load attempts
@@ -222,17 +224,35 @@ async def save_questions(request: Request, qualification: str = None):
         else:
             cur.execute("DELETE FROM questions;")
         for q in payload:
-            cur.execute("""
-            INSERT INTO questions (id, subject, question, options, correct, explanation, qualification)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (id) DO UPDATE SET
-                subject = EXCLUDED.subject,
-                question = EXCLUDED.question,
-                options = EXCLUDED.options,
-                correct = EXCLUDED.correct,
-                explanation = EXCLUDED.explanation,
-                qualification = EXCLUDED.qualification;
-            """, (q["id"], q["subject"], q["question"], Json(q["options"]), q["correct"], q.get("explanation", ""), qualification or q.get("qualification", "ม.ปลาย")))
+            source_file = q.get("sourceFile") or "คำถามทั่วไป (เพิ่มด้วยตนเอง)"
+            created_at = q.get("createdAt")
+            if created_at:
+                cur.execute("""
+                INSERT INTO questions (id, subject, question, options, correct, explanation, qualification, source_file, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (id) DO UPDATE SET
+                    subject = EXCLUDED.subject,
+                    question = EXCLUDED.question,
+                    options = EXCLUDED.options,
+                    correct = EXCLUDED.correct,
+                    explanation = EXCLUDED.explanation,
+                    qualification = EXCLUDED.qualification,
+                    source_file = EXCLUDED.source_file,
+                    created_at = EXCLUDED.created_at;
+                """, (q["id"], q["subject"], q["question"], Json(q["options"]), q["correct"], q.get("explanation", ""), qualification or q.get("qualification", "ม.ปลาย"), source_file, created_at))
+            else:
+                cur.execute("""
+                INSERT INTO questions (id, subject, question, options, correct, explanation, qualification, source_file)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (id) DO UPDATE SET
+                    subject = EXCLUDED.subject,
+                    question = EXCLUDED.question,
+                    options = EXCLUDED.options,
+                    correct = EXCLUDED.correct,
+                    explanation = EXCLUDED.explanation,
+                    qualification = EXCLUDED.qualification,
+                    source_file = EXCLUDED.source_file;
+                """, (q["id"], q["subject"], q["question"], Json(q["options"]), q["correct"], q.get("explanation", ""), qualification or q.get("qualification", "ม.ปลาย"), source_file))
         conn.commit()
         return {"status": "success"}
     except Exception as e:
