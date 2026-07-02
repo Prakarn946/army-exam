@@ -1928,7 +1928,8 @@ function renderAdminQuestionsList() {
         filtered.forEach(q => {
             const subj = q.subject || 'วิชาทั่วไป';
             const folderName = q.sourceFile || 'คำถามทั่วไป (เพิ่มด้วยตนเอง)';
-            const uploadTime = q.createdAt || '';
+            // Group all manual additions together under a single folder key
+            const uploadTime = folderName === 'คำถามทั่วไป (เพิ่มด้วยตนเอง)' ? '' : (q.createdAt || '');
             const folderKey = `${folderName}||${uploadTime}`;
             
             if (!groups[subj]) {
@@ -1976,15 +1977,27 @@ function renderAdminQuestionsList() {
                 folderHeader.className = 'folder-header';
                 folderHeader.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--bg-main); cursor: pointer; user-select: none; flex-wrap: wrap; gap: 10px;';
                 
-                const formattedDate = uploadTime ? `อัปโหลดเมื่อ: ${formatThaiDateTime(uploadTime)}` : '(เพิ่มด้วยตนเอง)';
+                let folderTitleHtml = '';
+                if (folderName === 'คำถามทั่วไป (เพิ่มด้วยตนเอง)') {
+                    folderTitleHtml = `
+                        <div style="display: flex; flex-direction: column; gap: 2px;">
+                            <span style="font-size: 14px; font-weight: 700; color: var(--text-main);">📁 คำถามทั่วไป (เพิ่มด้วยตนเอง)</span>
+                            <span style="font-size: 11px; color: var(--text-sub); font-weight: normal;">(คำถามที่สร้างขึ้นทีละข้อในระบบ)</span>
+                        </div>
+                    `;
+                } else {
+                    const formattedDate = formatThaiDateTime(uploadTime) || 'ไม่ระบุวันเวลา';
+                    folderTitleHtml = `
+                        <div style="display: flex; flex-direction: column; gap: 2px;">
+                            <span style="font-size: 14px; font-weight: 700; color: var(--text-main);">📁 อัปโหลดเมื่อ: ${formattedDate}</span>
+                            <span style="font-size: 11px; color: var(--text-sub); font-weight: normal;">ไฟล์: ${escapeHtml(folderName)}</span>
+                        </div>
+                    `;
+                }
                 
                 folderHeader.innerHTML = `
-                    <div class="folder-title" style="display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 13.5px; color: var(--text-main);">
-                        <span style="font-size: 20px;">📁</span>
-                        <div style="display: flex; flex-direction: column; gap: 2px;">
-                            <span style="font-size: 14px;">${escapeHtml(folderName)}</span>
-                            <span style="font-size: 11px; color: var(--text-sub); font-weight: normal;">${formattedDate}</span>
-                        </div>
+                    <div class="folder-title" style="display: flex; align-items: center; gap: 12px;">
+                        ${folderTitleHtml}
                         <span class="badge warning" style="margin-left: 6px; font-size: 10px; height: 18px; display: inline-flex; align-items: center;">${folderQuestions.length} ข้อ</span>
                     </div>
                     <div class="folder-actions" style="display: flex; align-items: center; gap: 8px;">
