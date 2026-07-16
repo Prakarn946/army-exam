@@ -1259,18 +1259,60 @@ function triggerExamSubmission() {
 
     if (confirm(warningText)) {
         clearInterval(timerIntervalId);
-        const user = getCurrentUser();
-        const result = submitExam(user.gmail, user.name);
-        showToast('บันทึกคะแนนสอบของคุณเรียบร้อยแล้ว!');
-        showExamResults(result);
+        try {
+            const user = getCurrentUser();
+            const gmail = user ? user.gmail : null;
+            const name = user ? user.name : null;
+            const result = submitExam(gmail, name);
+            showToast('บันทึกคะแนนสอบของคุณเรียบร้อยแล้ว!');
+            showExamResults(result);
+        } catch (error) {
+            console.error('Error during manual submit:', error);
+            
+            // Backup manual grading fallback to prevent candidates losing scores
+            try {
+                const session = getActiveSession(true);
+                if (session && session.questions) {
+                    let score = 0;
+                    session.questions.forEach(q => {
+                        if (session.answers && session.answers[q.id] === q.correct) score++;
+                    });
+                    const pct = Math.round((score / session.questions.length) * 100);
+                    alert(`⚠️ ระบบขัดข้องระหว่างบันทึกข้อมูลออนไลน์\n\nแต่ผลสอบได้รับการประมวลผลบนเครื่องของคุณสำเร็จแล้ว:\nคะแนนสอบของคุณคือ: ${score} / ${session.questions.length} ข้อ (${pct}%)\n\nกรุณา "ถ่ายรูปภาพหน้าจอนี้ไว้" และแจ้งคะแนนแก่ผู้ควบคุมสอบทันทีครับ`);
+                }
+            } catch (fallbackErr) {
+                console.error('Fallback grading failed:', fallbackErr);
+            }
+            
+            alert('เกิดข้อผิดพลาดในการส่งข้อสอบ: ' + error.message + '\n\nกรุณากดส่งข้อสอบใหม่อีกครั้ง หรือติดต่อผู้คุมสอบทันทีครับ');
+        }
     }
 }
 
 // Time's up submit
 function autoForceSubmit() {
-    const user = getCurrentUser();
-    const result = submitExam(user.gmail, user.name);
-    showExamResults(result);
+    try {
+        const user = getCurrentUser();
+        const gmail = user ? user.gmail : null;
+        const name = user ? user.name : null;
+        const result = submitExam(gmail, name);
+        showExamResults(result);
+    } catch (error) {
+        console.error('Error during autoForceSubmit:', error);
+        try {
+            const session = getActiveSession(true);
+            if (session && session.questions) {
+                let score = 0;
+                session.questions.forEach(q => {
+                    if (session.answers && session.answers[q.id] === q.correct) score++;
+                });
+                const pct = Math.round((score / session.questions.length) * 100);
+                alert(`⚠️ หมดเวลาทำข้อสอบแล้ว และระบบออนไลน์ขัดข้องชั่วคราว\n\nคะแนนประมวลผลบนเครื่องของคุณคือ: ${score} / ${session.questions.length} ข้อ (${pct}%)\n\nกรุณา "ถ่ายรูปภาพหน้าจอนี้ไว้" และแจ้งแก่ผู้ควบคุมสอบทันทีครับ`);
+            }
+        } catch (fallbackErr) {
+            console.error('Fallback grading in autoForceSubmit failed:', fallbackErr);
+        }
+    }
 }
 
 // ==========================================

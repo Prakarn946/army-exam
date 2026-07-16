@@ -77,7 +77,10 @@ export function startNewExam() {
         markedForReview: [], // array of questionIds
         startTime: startTime,
         endTime: startTime + durationMs,
-        currentQuestionIndex: 0
+        currentQuestionIndex: 0,
+        userGmail: currentUser ? currentUser.gmail : 'unknown@gmail.com',
+        userName: currentUser ? currentUser.name : 'ผู้เข้าสอบ',
+        qualification: q
     };
 
     saveActiveSession(activeSession);
@@ -152,8 +155,8 @@ export function submitExam(userGmail, userName) {
     const session = getActiveSession(true);
     if (!session) throw new Error('ไม่พบเซสชันการสอบปัจจุบัน หรือหมดเวลาการทำข้อสอบแล้ว');
 
-    const questions = session.questions;
-    const answers = session.answers;
+    const questions = session.questions || [];
+    const answers = session.answers || {};
     
     let totalScore = 0;
     const subjectStats = {}; // subject -> { correct, total }
@@ -185,7 +188,12 @@ export function submitExam(userGmail, userName) {
             explanation: q.explanation,
             userAnswer: userAnswer,
             isCorrect: isCorrect,
-            shuffledChoices: session.choicesMap[q.id]
+            shuffledChoices: (session.choicesMap && session.choicesMap[q.id]) || [
+                { key: 'A', text: q.options.A },
+                { key: 'B', text: q.options.B },
+                { key: 'C', text: q.options.C },
+                { key: 'D', text: q.options.D }
+            ]
         };
     });
 
@@ -193,12 +201,15 @@ export function submitExam(userGmail, userName) {
     const totalPercentage = totalQuestions > 0 ? Math.round((totalScore / totalQuestions) * 100) : 0;
 
     const currentUser = getCurrentUser();
-    const qualification = currentUser ? currentUser.qualification : 'ม.ปลาย';
+    const qualification = currentUser ? currentUser.qualification : (session.qualification || 'ม.ปลาย');
+
+    const finalGmail = userGmail || session.userGmail || 'unknown@gmail.com';
+    const finalName = userName || session.userName || 'ผู้เข้าสอบ';
 
     const attemptResult = {
         id: 'att_' + Date.now(),
-        userGmail: userGmail,
-        userName: userName,
+        userGmail: finalGmail,
+        userName: finalName,
         timestamp: Date.now(),
         totalQuestions: totalQuestions,
         totalScore: totalScore,
