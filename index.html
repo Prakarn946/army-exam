@@ -83,6 +83,19 @@
                             </div>
                             <button type="submit" class="primary-btn">เข้าสู่ระบบ</button>
                         </form>
+
+                        <!-- Maintenance Message Card -->
+                        <div id="maintenance-container" class="d-none" style="text-align: center; padding: 20px 0;">
+                            <div style="font-size: 48px; margin-bottom: 16px;">⚙️</div>
+                            <h3 style="color: var(--accent-color); font-weight: 700; margin-bottom: 12px; font-size: 16px;">ระบบปิดปรับปรุงชั่วคราว</h3>
+                            <p style="color: var(--text-main); font-size: 13px; line-height: 1.6; margin-bottom: 20px; font-weight: 500;">
+                                ขณะนี้ระบบกำลังอยู่ระหว่างการปิดปรับปรุงหรือตั้งค่าข้อสอบชั่วคราว<br>
+                                ขออภัยในความไม่สะดวกและกรุณากลับมาลองใหม่อีกครั้งภายหลังครับ
+                            </p>
+                            <div style="border-top: 1px solid var(--border-color); padding-top: 16px;">
+                                <a href="#" id="admin-bypass-link" style="font-size: 11.5px; color: var(--text-sub); text-decoration: underline;">สำหรับผู้ดูแลระบบ (Admin)</a>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -235,6 +248,22 @@
                                 </button>
                             </div>
                     
+                            <!-- System Status Configuration Widget -->
+                            <div class="admin-widget-card" style="margin-top: 16px; padding: 16px; background: var(--bg-card); border: 1.5px solid var(--border-color); border-radius: var(--radius-sm); box-shadow: 0 4px 12px var(--shadow-color);">
+                                <div style="font-weight: 700; font-size: 13px; margin-bottom: 10px; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+                                    ⚙️ สถานะระบบสอบ
+                                </div>
+                                <div style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                                    <input type="checkbox" id="config-maintenance-mode" style="width: 16px; height: 16px; cursor: pointer; margin: 0;">
+                                    <label for="config-maintenance-mode" style="font-size: 12px; font-weight: 600; color: var(--text-main); cursor: pointer; user-select: none; margin: 0;">
+                                        ปิดระบบสอบชั่วคราว (ปรับปรุง)
+                                    </label>
+                                </div>
+                                <button id="save-system-status-btn" class="primary-btn" style="width: 100%; padding: 8px; font-size: 12px; font-weight: 600; margin: 0; border-radius: var(--radius-xs); background: #d32f2f; border-color: #d32f2f;">
+                                    💾 บันทึกสถานะระบบ
+                                </button>
+                            </div>
+
                             <!-- Database Capacity Widget -->
                             <div class="admin-widget-card" style="margin-top: 16px; padding: 16px; background: var(--bg-card); border: 1.5px solid var(--border-color); border-radius: var(--radius-sm); box-shadow: 0 4px 12px var(--shadow-color);">
                                 <div style="font-weight: 700; font-size: 13px; margin-bottom: 10px; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
