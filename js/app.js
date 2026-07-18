@@ -29,6 +29,44 @@ function populateSidebarLoginSubtitle() {
     }
 }
 
+// Apply maintenance mode view state
+function applySystemStatusMode() {
+    const config = getConfig('ม.ปลาย');
+    const isMaintenance = config.maintenanceMode === true;
+    
+    const loginForm = document.getElementById('login-form');
+    const maintenanceContainer = document.getElementById('maintenance-container');
+    const mCheckbox = document.getElementById('config-maintenance-mode');
+    
+    if (mCheckbox) {
+        mCheckbox.checked = isMaintenance;
+    }
+    
+    const user = getCurrentUser();
+    if (isMaintenance) {
+        // Admins can bypass maintenance
+        if (user && user.role === 'admin') {
+            if (maintenanceContainer) maintenanceContainer.classList.add('d-none');
+            if (loginForm) loginForm.classList.remove('d-none');
+            return;
+        }
+        
+        // Hide login form and show maintenance card
+        if (loginForm) loginForm.classList.add('d-none');
+        if (maintenanceContainer) maintenanceContainer.classList.remove('d-none');
+        
+        // Force log out candidates if they try to access candidate view
+        if (user && user.role !== 'admin') {
+            logout();
+            showView('auth-view');
+            showToast('⚠️ ระบบถูกปิดชั่วคราวเพื่อปรับปรุงระบบ', 'warning');
+        }
+    } else {
+        if (maintenanceContainer) maintenanceContainer.classList.add('d-none');
+        if (loginForm) loginForm.classList.remove('d-none');
+    }
+}
+
 
 // UI Toast Helper
 function showToast(message, type = 'success') {
@@ -137,6 +175,10 @@ async function runPeriodicSync() {
         }
         // Background sync only needs attempts/users, so we skip downloading questions (very heavy)
         const synced = await syncFromBackend(scope, true);
+        
+        // Refresh system maintenance view state on sync
+        applySystemStatusMode();
+
         if (synced && user) {
             if (user.role === 'admin') {
                 renderLeaderboard();
@@ -165,6 +207,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Set subtitle in login view
     updateLoginSubtitle();
     populateSidebarLoginSubtitle();
+    applySystemStatusMode();
+
+    // Admin bypass link for maintenance mode
+    const adminBypassLink = document.getElementById('admin-bypass-link');
+    if (adminBypassLink) {
+        adminBypassLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            const loginForm = document.getElementById('login-form');
+            const maintenanceContainer = document.getElementById('maintenance-container');
+            if (loginForm) loginForm.classList.remove('d-none');
+            if (maintenanceContainer) maintenanceContainer.classList.add('d-none');
+        });
+    }
     
     // Start real-time heartbeat sync loop (every 8 seconds)
     setInterval(sendHeartbeat, 8000);
@@ -289,6 +344,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             const pass = document.getElementById('login-password').value;
             try {
                 const user = await loginUser(email, pass);
+                
+                // Block candidate logins if system is closed (maintenance mode)
+                const config = getConfig('ม.ปลาย');
+                if (config.maintenanceMode === true && user.role !== 'admin') {
+                    logoutUser();
+                    throw new Error('ขออภัย ระบบอยู่ระหว่างปิดปรับปรุงชั่วคราว ไม่สามารถเข้าใช้งานได้ในขณะนี้');
+                }
+
                 showToast(`เข้าสู่ระบบสำเร็จ ยินดีต้อนรับ ${user.name}`);
                 loginForm.reset();
                 checkSessionAndRedirect();
@@ -1680,6 +1743,28 @@ function initAdminDashboard() {
             // Immediately update the login view subtitle text
             updateLoginSubtitle();
             showToast('💾 บันทึกข้อความหน้าล็อกอินเรียบร้อยแล้ว!');
+        };
+    }
+
+    // Bind System status (Maintenance mode) save button in the sidebar (global setting)
+    const saveStatusBtn = document.getElementById('save-system-status-btn');
+    if (saveStatusBtn && !saveStatusBtn.dataset.bound) {
+        saveStatusBtn.dataset.bound = 'true';
+        saveStatusBtn.onclick = () => {
+            const isMaintenance = document.getElementById('config-maintenance-mode').checked;
+            
+            // Save to both qualification configs to stay synchronized
+            const configHS = getConfig('ม.ปลาย');
+            configHS.maintenanceMode = isMaintenance;
+            saveConfig(configHS, 'ม.ปลาย');
+            
+            const configBach = getConfig('ป.ตรี');
+            configBach.maintenanceMode = isMaintenance;
+            saveConfig(configBach, 'ป.ตรี');
+            
+            // Immediately apply the new status state
+            applySystemStatusMode();
+            showToast(isMaintenance ? '⚙️ ปิดระบบสอบชั่วคราวแล้ว' : '✅ เปิดระบบสอบเป็นปกติแล้ว!');
         };
     }
 
